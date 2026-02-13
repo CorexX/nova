@@ -477,7 +477,7 @@ ova-server Ingestion Endpoint
 ova-knowledge
 5. Monitoring/Retry/Dead-Letter
 
-Guide: guides/ingestion-pipeline-nova-server.md
+Guide: playbooks/ingestion-pipeline-nova-server.md
 
 ---
 

@@ -207,7 +207,7 @@ nova-core/                      nova-knowledge/
 ├── mcp/                        ├── inbox/
 │   ├── nova_mcp_core_server.py ├── areas/
 │   └── tools/                  ├── projects/
-├── guides/                     ├── resources/
+├── playbooks/                  ├── resources/
 ├── playbooks/                  └── operations/
 ├── templates/
 ├── setup.py

@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Obsidian
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
+# Secrets
+.env
+*.pem
+*.key
+secrets/
+
+# NOVA Config (user-specific)
+nova.toml
+../nova.toml
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NOVA Index Artefakte
+index/chroma/
+index/file_hashes.json
+
+# NOVA (private)
+.nova/
+nova-knowledge/
+/core/Core.md
+AGENTS.md
+index/
+.pytest_cache/

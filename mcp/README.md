@@ -137,7 +137,7 @@ Der `nova_health_check` zeigt den Status aller NOVA-Subsysteme in 5 Gruppen:
 | CONTENT | Playbooks, Guides, Skills, Templates |
 | TODAY | Heutige Worklog-Einträge, CURRENT.md Aktualität |
 
-> **⚠️ Hinweis:** VS Code löscht Chat-Sessions automatisch. Für `summarize_day/week` müssen Sessions noch vorhanden sein. Siehe [close-day-workflow.md](../guides/close-day-workflow.md#vs-code-session-retention).
+> **⚠️ Hinweis:** VS Code löscht Chat-Sessions automatisch. Für `summarize_day/week` müssen Sessions noch vorhanden sein. Siehe [close-day-workflow.md](../playbooks/close-day-workflow.md#vs-code-session-retention).
 
 ---
 

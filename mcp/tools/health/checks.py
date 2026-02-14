@@ -289,16 +289,22 @@ def check_python_version(workspace_root: Path) -> CheckResult:
 def check_core_files(workspace_root: Path) -> CheckResult:
     """Prueft ob Core-Dateien existieren."""
     paths = resolve_paths(workspace_root)
-    core_files = [
+    required_core_files = [
         paths.core_md,
         paths.principles_md,
+    ]
+    instruction_candidates = [
+        workspace_root / "AGENTS.md",
         workspace_root / ".github" / "copilot-instructions.md",
     ]
     
     missing = []
-    for f in core_files:
+    for f in required_core_files:
         if not f.exists():
             missing.append(f.name)
+
+    if not any(candidate.exists() for candidate in instruction_candidates):
+        missing.append("AGENTS.md/.github/copilot-instructions.md")
     
     if missing:
         return CheckResult(
@@ -312,7 +318,7 @@ def check_core_files(workspace_root: Path) -> CheckResult:
     return CheckResult(
         name="Core Files",
         status="ok",
-        message=f"{len(core_files)} vorhanden",
+        message=f"{len(required_core_files) + 1} vorhanden",
         group="CORE"
     )
 

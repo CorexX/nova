@@ -64,3 +64,27 @@ class TestPrinciplesPathFallback:
         cfg = load_config(tmp_path)
 
         assert cfg.principles_md == (tmp_path / "meta" / "PRINCIPLES.md")
+
+
+class TestExternalPathConfig:
+    """Explizite TOML-Pfade bleiben erhalten."""
+
+    def test_honors_external_knowledge_root_from_toml(self, tmp_path: Path):
+        (tmp_path / "mcp").mkdir()
+        (tmp_path / "core").mkdir()
+
+        external_knowledge = tmp_path.parent / "external-knowledge"
+        external_knowledge.mkdir()
+        (external_knowledge / "CURRENT.md").write_text("# CURRENT", encoding="utf-8")
+
+        (tmp_path / "nova.toml").write_text(
+            f"""
+[paths]
+knowledge_root = "{external_knowledge.as_posix()}"
+""".strip(),
+            encoding="utf-8",
+        )
+
+        cfg = load_config(tmp_path)
+
+        assert cfg.knowledge_root == external_knowledge.resolve()

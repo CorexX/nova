@@ -1,6 +1,6 @@
 ﻿"""
-Individual Health Checks fÃ¼r NOVA Systems.
-Jeder Check ist schnell (<100ms) und gibt strukturierten Status zurÃ¼ck.
+Individual Health Checks fuer NOVA Systems.
+Jeder Check ist schnell (<100ms) und gibt strukturierten Status zurueck.
 """
 
 import json
@@ -19,11 +19,11 @@ class CheckResult(NamedTuple):
     message: str
     detail: str = ""
     action: str = ""  # Empfohlene Aktion bei Problemen
-    group: str = ""   # GruppenzugehÃ¶rigkeit
+    group: str = ""   # Gruppenzugehoerigkeit
 
 
 class CheckGroup(NamedTuple):
-    """Gruppierte Checks fÃ¼r Ã¼bersichtliche Darstellung."""
+    """Gruppierte Checks fuer uebersichtliche Darstellung."""
     name: str
     checks: list[CheckResult]
     
@@ -38,7 +38,7 @@ class CheckGroup(NamedTuple):
 
 
 def check_vault_index(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft ob Vault indexiert ist."""
+    """Prueft ob Vault indexiert ist."""
     paths = resolve_paths(workspace_root)
     hash_file = paths.index_root / "file_hashes.json"
     chroma_path = paths.chroma_path
@@ -49,7 +49,7 @@ def check_vault_index(workspace_root: Path) -> CheckResult:
             status="error",
             message="Nicht indexiert",
             detail="file_hashes.json fehlt",
-            action="FÃ¼hre `nova_index_vault` aus"
+            action="Fuehre `nova_index_vault` aus"
         )
     
     try:
@@ -61,13 +61,13 @@ def check_vault_index(workspace_root: Path) -> CheckResult:
             status="error",
             message="Korrupt",
             detail=str(e),
-            action="FÃ¼hre `nova_index_vault` mit force=true aus"
+            action="Fuehre `nova_index_vault` mit force=true aus"
         )
     
-    # PrÃ¼fe ob ChromaDB Ordner existiert (ohne ChromaDB zu laden - das dauert 3-4s!)
+    # Pruefe ob ChromaDB Ordner existiert (ohne ChromaDB zu laden - das dauert 3-4s!)
     chunk_info = ""
     if chroma_path.exists():
-        # SchÃ¤tze Chunks basierend auf Dateien (schnell, ohne ChromaDB Import)
+        # Schaetze Chunks basierend auf Dateien (schnell, ohne ChromaDB Import)
         chunk_info = "indexed"
     else:
         chunk_info = "nicht initialisiert"
@@ -78,7 +78,7 @@ def check_vault_index(workspace_root: Path) -> CheckResult:
             status="warning",
             message="Leer",
             detail="0 Dateien indexiert",
-            action="FÃ¼hre `nova_index_vault` aus"
+            action="Fuehre `nova_index_vault` aus"
         )
     
     return CheckResult(
@@ -90,14 +90,14 @@ def check_vault_index(workspace_root: Path) -> CheckResult:
 
 
 def check_embedding_model(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft ob Embedding Model gecached ist."""
+    """Prueft ob Embedding Model gecached ist."""
     # Standard HuggingFace Cache Pfad
     model_name = "sentence-transformers--all-MiniLM-L6-v2"
     cache_path = Path(os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface"))
     model_path = cache_path / "hub" / f"models--{model_name}"
     
     if model_path.exists():
-        # Berechne GrÃ¶ÃŸe
+        # Berechne Groesse
         try:
             size_mb = sum(f.stat().st_size for f in model_path.rglob("*") if f.is_file()) / (1024 * 1024)
             return CheckResult(
@@ -118,12 +118,12 @@ def check_embedding_model(workspace_root: Path) -> CheckResult:
         status="warning",
         message="Nicht cached",
         detail="Wird beim ersten Aufruf heruntergeladen (~380 MB)",
-        action="Erster `nova_search_vault` Aufruf lÃ¤dt das Modell"
+        action="Erster `nova_search_vault` Aufruf laedt das Modell"
     )
 
 
 def check_worklog_today(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft WORKLOG.md auf heutige EintrÃ¤ge."""
+    """Prueft WORKLOG.md auf heutige Eintraege."""
     worklog_path = resolve_paths(workspace_root).worklog_md
     
     if not worklog_path.exists():
@@ -139,10 +139,10 @@ def check_worklog_today(workspace_root: Path) -> CheckResult:
         content = worklog_path.read_text(encoding="utf-8")
         today_str = datetime.now().strftime("%Y-%m-%d")
         
-        # ZÃ¤hle EintrÃ¤ge mit heutigem Datum oder Zeitstempel
+        # Zaehle Eintraege mit heutigem Datum oder Zeitstempel
         today_entries = content.count(today_str)
         
-        # Alternativ: ZÃ¤hle Zeitstempel-Pattern fÃ¼r heute (z.B. "- 09:30")
+        # Alternativ: Zaehle Zeitstempel-Pattern fuer heute (z.B. "- 09:30")
         import re
         time_pattern = re.findall(r"^- \d{2}:\d{2}", content, re.MULTILINE)
         
@@ -150,13 +150,13 @@ def check_worklog_today(workspace_root: Path) -> CheckResult:
             return CheckResult(
                 name="Worklog",
                 status="ok",
-                message=f"Heute: {today_entries} EintrÃ¤ge"
+                message=f"Heute: {today_entries} Eintraege"
             )
         else:
             return CheckResult(
                 name="Worklog",
                 status="ok",
-                message="Heute: 0 EintrÃ¤ge",
+                message="Heute: 0 Eintraege",
                 detail="Noch nichts dokumentiert"
             )
     except Exception as e:
@@ -169,7 +169,7 @@ def check_worklog_today(workspace_root: Path) -> CheckResult:
 
 
 def check_current_freshness(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft ob CURRENT.md aktuell ist."""
+    """Prueft ob CURRENT.md aktuell ist."""
     current_path = resolve_paths(workspace_root).current_md
     
     if not current_path.exists():
@@ -182,11 +182,11 @@ def check_current_freshness(workspace_root: Path) -> CheckResult:
         )
     
     try:
-        # PrÃ¼fe Datei-Ã„nderungsdatum
+        # Pruefe Datei-Aenderungsdatum
         mtime = datetime.fromtimestamp(current_path.stat().st_mtime)
         age = datetime.now() - mtime
         
-        # PrÃ¼fe auch den Inhalt auf "Letzte Aktualisierung"
+        # Pruefe auch den Inhalt auf "Letzte Aktualisierung"
         content = current_path.read_text(encoding="utf-8")
         import re
         update_match = re.search(r"Letzte Aktualisierung:\s*(\d{4}-\d{2}-\d{2})", content)
@@ -213,14 +213,14 @@ def check_current_freshness(workspace_root: Path) -> CheckResult:
                 name="CURRENT",
                 status="warning",
                 message=f"{age.days} Tage alt",
-                detail=f"Letzte Ã„nderung: {mtime.strftime('%Y-%m-%d')}",
+                detail=f"Letzte Aenderung: {mtime.strftime('%Y-%m-%d')}",
                 action="CURRENT.md aktualisieren"
             )
     except Exception as e:
         return CheckResult(
             name="CURRENT",
             status="warning",
-            message="PrÃ¼fung fehlgeschlagen",
+            message="Pruefung fehlgeschlagen",
             detail=str(e)
         )
 
@@ -230,7 +230,7 @@ def check_current_freshness(workspace_root: Path) -> CheckResult:
 # =============================================================================
 
 def check_mcp_tools(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft registrierte MCP Tools."""
+    """Prueft registrierte MCP Tools."""
     core_root = resolve_paths(workspace_root).core_root
     server_path = core_root / "mcp" / "nova_mcp_core_server.py"
 
@@ -244,7 +244,7 @@ def check_mcp_tools(workspace_root: Path) -> CheckResult:
     
     try:
         content = server_path.read_text(encoding="utf-8")
-        # ZÃ¤hle EintrÃ¤ge in TOOLS dict
+        # Zaehle Eintraege in TOOLS dict
         import re
         tools = re.findall(r'"nova_\w+":', content)
         count = len(tools)
@@ -266,7 +266,7 @@ def check_mcp_tools(workspace_root: Path) -> CheckResult:
 
 
 def check_python_version(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft Python Version."""
+    """Prueft Python Version."""
     version = f"{sys.version_info.major}.{sys.version_info.minor}"
     
     if sys.version_info >= (3, 11):
@@ -287,7 +287,7 @@ def check_python_version(workspace_root: Path) -> CheckResult:
 
 
 def check_core_files(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft ob Core-Dateien existieren."""
+    """Prueft ob Core-Dateien existieren."""
     paths = resolve_paths(workspace_root)
     core_files = [
         paths.core_md,
@@ -318,7 +318,7 @@ def check_core_files(workspace_root: Path) -> CheckResult:
 
 
 def check_dependencies(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft ob wichtige Dependencies installiert sind."""
+    """Prueft ob wichtige Dependencies installiert sind."""
     required = ["mcp", "chromadb", "sentence_transformers"]
     missing = []
     
@@ -398,7 +398,7 @@ def check_notes_total(workspace_root: Path) -> CheckResult:
 
 
 def check_tickets(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft TICKETS.md."""
+    """Prueft TICKETS.md."""
     tickets_path = resolve_paths(workspace_root).tickets_md
     
     if not tickets_path.exists():
@@ -413,13 +413,13 @@ def check_tickets(workspace_root: Path) -> CheckResult:
     return CheckResult(
         name="TICKETS",
         status="ok",
-        message="âœ“",
+        message="OK",
         group="VAULT"
     )
 
 
 def check_worklog_exists(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft ob WORKLOG.md existiert und schreibbar ist."""
+    """Prueft ob WORKLOG.md existiert und schreibbar ist."""
     worklog_path = resolve_paths(workspace_root).worklog_md
     
     if not worklog_path.exists():
@@ -431,13 +431,13 @@ def check_worklog_exists(workspace_root: Path) -> CheckResult:
             group="VAULT"
         )
     
-    # PrÃ¼fe Schreibrechte
+    # Pruefe Schreibrechte
     try:
         if os.access(worklog_path, os.W_OK):
             return CheckResult(
                 name="WORKLOG",
                 status="ok",
-                message="âœ“",
+                message="OK",
                 group="VAULT"
             )
         else:
@@ -451,7 +451,7 @@ def check_worklog_exists(workspace_root: Path) -> CheckResult:
         return CheckResult(
             name="WORKLOG",
             status="ok",
-            message="âœ“",
+            message="OK",
             group="VAULT"
         )
 
@@ -461,7 +461,7 @@ def check_worklog_exists(workspace_root: Path) -> CheckResult:
 # =============================================================================
 
 def check_playbooks(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft Playbooks."""
+    """Prueft Playbooks."""
     playbooks_path = resolve_paths(workspace_root).core_root / "playbooks"
     
     if not playbooks_path.exists():
@@ -482,7 +482,7 @@ def check_playbooks(workspace_root: Path) -> CheckResult:
 
 
 def check_guides(workspace_root: Path) -> CheckResult:
-    """PrÃ¼ft Guides."""
+    """Prueft Guides."""
     guides_path = resolve_paths(workspace_root).core_root / "guides"
     
     if not guides_path.exists():
@@ -580,13 +580,13 @@ def check_n8n_optional(workspace_root: Path) -> CheckResult:
 # =============================================================================
 
 async def run_all_checks(workspace_root: Path) -> list[CheckResult]:
-    """FÃ¼hrt alle Health Checks aus (Legacy - flache Liste)."""
+    """Fuehrt alle Health Checks aus (Legacy - flache Liste)."""
     groups = await run_grouped_checks(workspace_root)
     return [check for group in groups for check in group.checks]
 
 
 async def run_grouped_checks(workspace_root: Path) -> list[CheckGroup]:
-    """FÃ¼hrt alle Health Checks gruppiert aus."""
+    """Fuehrt alle Health Checks gruppiert aus."""
     
     # CORE Gruppe
     core_checks = [
@@ -635,12 +635,12 @@ async def run_grouped_checks(workspace_root: Path) -> list[CheckGroup]:
 
 
 def format_compact(checks: list[CheckResult]) -> str:
-    """Formatiert Checks als kompakte Einzeiler fÃ¼r session_init (Legacy)."""
-    icons = {"ok": "âœ…", "warning": "âš ï¸", "error": "âŒ", "info": "â„¹ï¸"}
+    """Formatiert Checks als kompakte Einzeiler fuer session_init (Legacy)."""
+    icons = {"ok": "[OK]", "warning": "[WARN]", "error": "[ERR]", "info": "[INFO]"}
     
     parts = []
     for check in checks:
-        icon = icons.get(check.status, "â“")
+        icon = icons.get(check.status, "[?]")
         msg = check.message
         if check.detail:
             msg += f" ({check.detail})"
@@ -651,18 +651,9 @@ def format_compact(checks: list[CheckResult]) -> str:
 
 def format_grouped_compact(groups: list[CheckGroup]) -> str:
     """
-    Formatiert gruppierte Checks als 5-Zeilen-Box fÃ¼r session_init.
-    
-    Beispiel:
-    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-    â”‚ CORE     MCP âœ… 16 Tools â”‚ Python 3.12 âœ… â”‚ Files âœ…        â”‚
-    â”‚ VAULT    9 Kunden â”‚ 2 Kompetenz â”‚ WORKLOG âœ… â”‚ TICKETS âœ…   â”‚
-    â”‚ SEARCH   Model âœ… â”‚ Index âœ… 67 files                       â”‚
-    â”‚ CONTENT  1 Playbook â”‚ 3 Guides â”‚ 4 Skills â”‚ 2 Templates    â”‚
-    â”‚ TODAY    Worklog: 0 â”‚ CURRENT: 1d                          â”‚
-    â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+    Formatiert gruppierte Checks als 5-Zeilen-Box fuer session_init.
     """
-    icons = {"ok": "âœ…", "warning": "âš ï¸", "error": "âŒ", "info": "â„¹ï¸"}
+    icons = {"ok": "[OK]", "warning": "[WARN]", "error": "[ERR]", "info": "[INFO]"}
     
     lines = []
     for group in groups:
@@ -675,17 +666,17 @@ def format_grouped_compact(groups: list[CheckGroup]) -> str:
             else:
                 parts.append(f"{check.name} {icon}")
         
-        line = f"{group.name:<8} {' â”‚ '.join(parts)}"
+        line = f"{group.name:<8} {' | '.join(parts)}"
         lines.append(line)
     
     # Einfache Box (ASCII-kompatibel)
     max_len = max(len(line) for line in lines) + 2
-    box_top = "â”Œ" + "â”€" * max_len + "â”"
-    box_bot = "â””" + "â”€" * max_len + "â”˜"
+    box_top = "+" + "-" * max_len + "+"
+    box_bot = "+" + "-" * max_len + "+"
     
     result = [box_top]
     for line in lines:
-        result.append(f"â”‚ {line:<{max_len-1}}â”‚")
+        result.append(f"| {line:<{max_len-1}}|")
     result.append(box_bot)
     
     return "\n".join(result)
@@ -693,9 +684,9 @@ def format_grouped_compact(groups: list[CheckGroup]) -> str:
 
 def format_grouped_simple(groups: list[CheckGroup]) -> str:
     """
-    Einfachere Version ohne Box - fÃ¼r bessere KompatibilitÃ¤t.
+    Einfachere Version ohne Box - fuer bessere Kompatibilitaet.
     """
-    icons = {"ok": "âœ…", "warning": "âš ï¸", "error": "âŒ", "info": "â„¹ï¸"}
+    icons = {"ok": "[OK]", "warning": "[WARN]", "error": "[ERR]", "info": "[INFO]"}
     
     lines = []
     for group in groups:
@@ -705,7 +696,7 @@ def format_grouped_simple(groups: list[CheckGroup]) -> str:
             icon = icons.get(check.status, "")
             parts.append(f"{check.name} {check.message}")
         
-        line = f"{group_icon} **{group.name}:** {' â”‚ '.join(parts)}"
+        line = f"{group_icon} **{group.name}:** {' | '.join(parts)}"
         lines.append(line)
     
     return "\n".join(lines)
@@ -713,12 +704,12 @@ def format_grouped_simple(groups: list[CheckGroup]) -> str:
 
 def format_compact_oneline(checks: list[CheckResult]) -> str:
     """Noch kompaktere Version - nur Icons und Kurzname."""
-    icons = {"ok": "âœ…", "warning": "âš ï¸", "error": "âŒ", "info": "â„¹ï¸"}
+    icons = {"ok": "[OK]", "warning": "[WARN]", "error": "[ERR]", "info": "[INFO]"}
     
     parts = []
     for check in checks:
-        icon = icons.get(check.status, "â“")
-        # KÃ¼rze Namen
+        icon = icons.get(check.status, "[?]")
+        # Kuerze Namen
         short_names = {
             "Vault Index": "Vault",
             "Embedding Model": "Model", 
@@ -733,22 +724,23 @@ def format_compact_oneline(checks: list[CheckResult]) -> str:
 
 
 def get_actions_required(checks: list[CheckResult]) -> list[str]:
-    """Gibt Liste der empfohlenen Aktionen zurÃ¼ck."""
+    """Gibt Liste der empfohlenen Aktionen zurueck."""
     return [
-        f"â†’ {check.action}" 
+        f"-> {check.action}" 
         for check in checks 
         if check.action and check.status in ("warning", "error")
     ]
 
 
 def get_actions_from_groups(groups: list[CheckGroup]) -> list[str]:
-    """Gibt Liste der empfohlenen Aktionen aus Gruppen zurÃ¼ck."""
+    """Gibt Liste der empfohlenen Aktionen aus Gruppen zurueck."""
     actions = []
     for group in groups:
         for check in group.checks:
             if check.action and check.status in ("warning", "error"):
-                actions.append(f"â†’ {check.action}")
+                actions.append(f"-> {check.action}")
     return actions
+
 
 
 

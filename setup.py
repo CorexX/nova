@@ -562,6 +562,13 @@ def show_preview(config: SetupConfig, findings: dict) -> None:
             ok("~/.codex/config.toml (mcp_servers.nova-skills aktualisieren)")
         else:
             info("~/.codex/config.toml (unveraendert)")
+
+    if not is_within(config.knowledge_root, config.workspace):
+        workspace_file = config.workspace / "nova.code-workspace"
+        if workspace_file.exists():
+            info("nova.code-workspace (aktualisieren)")
+        else:
+            ok("nova.code-workspace (neu)")
     
     ok(f"core/CORE.md <- templates/personas/base.md + {config.persona}.md")
     
@@ -748,6 +755,52 @@ Details in: [CORE.md]({core_ref})
 - If the tool call fails, report the failure briefly and continue with the best available local context.
 """.replace("{core_path_hint}", core_path_hint), encoding="utf-8")
             ok("AGENTS.md")
+
+    # 8. Optional: VS Code Multi-Root Workspace (falls Knowledge ausserhalb liegt)
+    if not is_within(config.knowledge_root, config.workspace):
+        workspace_file = config.workspace / "nova.code-workspace"
+
+        try:
+            existing = {}
+            if workspace_file.exists():
+                existing = json.loads(workspace_file.read_text(encoding="utf-8"))
+                if not isinstance(existing, dict):
+                    existing = {}
+        except Exception:
+            existing = {}
+
+        folders = existing.get("folders", [])
+        if not isinstance(folders, list):
+            folders = []
+
+        def _folder_path(path: Path) -> str:
+            try:
+                return path.resolve().relative_to(config.workspace.resolve()).as_posix() or "."
+            except ValueError:
+                return path.resolve().as_posix()
+
+        core_folder = "."
+        knowledge_folder = _folder_path(config.knowledge_root)
+
+        existing_paths = {
+            str(entry.get("path")).strip()
+            for entry in folders
+            if isinstance(entry, dict) and entry.get("path")
+        }
+
+        changed = False
+        if core_folder not in existing_paths:
+            folders.append({"path": core_folder, "name": config.core_dir.name})
+            changed = True
+        if knowledge_folder not in existing_paths:
+            folders.append({"path": knowledge_folder, "name": config.knowledge_root.name})
+            changed = True
+
+        existing["folders"] = folders
+
+        if changed or not workspace_file.exists():
+            workspace_file.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+            ok("nova.code-workspace")
     
     return True
 
@@ -828,6 +881,8 @@ def show_next_steps(config: SetupConfig, quality_gate_ran: bool) -> None:
     else:
         p(f"  5. Quality gate: {quality_gate_cmd}")
     p(f"  6. Local tool run (fallback): {local_tool_cmd}")
+    if not is_within(config.knowledge_root, config.workspace):
+        p("  7. VS Code multi-root: open `nova.code-workspace` to include knowledge folder")
     p()
 
 
@@ -839,9 +894,9 @@ def update_codex_config(core_dir: Path) -> bool:
     launcher_py = (core_dir / "launcher.py").resolve()
     cwd = core_dir.resolve()
 
-    # TOML basic string with escaped backslashes (Windows-safe).
-    server_s = str(launcher_py).replace("\\", "\\\\")
-    cwd_s = str(cwd).replace("\\", "\\\\")
+    # Use forward slashes for TOML - works on Windows and avoids escape issues.
+    server_s = launcher_py.as_posix()
+    cwd_s = cwd.as_posix()
 
     block = (
         "[mcp_servers.nova-skills]\n"

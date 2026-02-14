@@ -14,6 +14,7 @@ from tools.health.checks import (
     check_vault_index,
     check_worklog_today,
     check_current_freshness,
+    check_core_files,
     check_n8n_optional,
 )
 
@@ -237,6 +238,33 @@ class TestCheckN8nOptional:
         monkeypatch.setenv("N8N_BASE_URL", "https://n8n.home")
         monkeypatch.setenv("N8N_API_KEY", "key")
         result = check_n8n_optional(tmp_path)
+        assert result.status == "ok"
+
+
+class TestCheckCoreFiles:
+    """Tests fuer check_core_files mit Codex/GitHub Instructions."""
+
+    def test_ok_when_agents_md_exists(self, tmp_path: Path):
+        (tmp_path / "mcp").mkdir()
+        (tmp_path / "core").mkdir()
+        (tmp_path / "core" / "CORE.md").write_text("# CORE", encoding="utf-8")
+        (tmp_path / "meta").mkdir()
+        (tmp_path / "meta" / "PRINCIPLES.md").write_text("# PRINCIPLES", encoding="utf-8")
+        (tmp_path / "AGENTS.md").write_text("# AGENTS", encoding="utf-8")
+
+        result = check_core_files(tmp_path)
+        assert result.status == "ok"
+
+    def test_ok_when_github_copilot_instructions_exists(self, tmp_path: Path):
+        (tmp_path / "mcp").mkdir()
+        (tmp_path / "core").mkdir()
+        (tmp_path / "core" / "CORE.md").write_text("# CORE", encoding="utf-8")
+        (tmp_path / "meta").mkdir()
+        (tmp_path / "meta" / "PRINCIPLES.md").write_text("# PRINCIPLES", encoding="utf-8")
+        (tmp_path / ".github").mkdir()
+        (tmp_path / ".github" / "copilot-instructions.md").write_text("# CI", encoding="utf-8")
+
+        result = check_core_files(tmp_path)
         assert result.status == "ok"
 
 

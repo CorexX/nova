@@ -111,6 +111,16 @@ def _env_or(key: str, toml_val: Any, default: Any) -> Any:
     return default
 
 
+def _configured_value(key: str, toml_val: Any) -> Any:
+    """Returns explicit config value from ENV first, then TOML, else None."""
+    env_val = os.getenv(key)
+    if env_val is not None:
+        return env_val
+    if toml_val is not None:
+        return toml_val
+    return None
+
+
 def _resolve_path(
     raw: str | None, default: Path, workspace_root: Path
 ) -> Path:
@@ -161,28 +171,17 @@ def load_config(workspace_root: Path) -> NovaConfig:
     workspace_root = workspace_root.resolve()
 
     # Paths
-    core_root = _resolve_path(
-        _env_or("NOVA_CORE_ROOT", paths_cfg.get("core_root"), None),
-        core_default,
-        workspace_root,
-    )
-    knowledge_root = _resolve_path(
-        _env_or("NOVA_KNOWLEDGE_ROOT", paths_cfg.get("knowledge_root"), None),
-        knowledge_default,
-        workspace_root,
-    )
-    index_root = _resolve_path(
-        _env_or("NOVA_INDEX_ROOT", paths_cfg.get("index_root"), None),
-        workspace_root / ".nova" / "index",
-        workspace_root,
-    )
+    core_raw = _configured_value("NOVA_CORE_ROOT", paths_cfg.get("core_root"))
+    knowledge_raw = _configured_value("NOVA_KNOWLEDGE_ROOT", paths_cfg.get("knowledge_root"))
+    index_raw = _configured_value("NOVA_INDEX_ROOT", paths_cfg.get("index_root"))
+    chroma_raw = _configured_value("NOVA_CHROMA_PATH", search_cfg.get("chroma_path"))
+
+    core_root = _resolve_path(core_raw, core_default, workspace_root)
+    knowledge_root = _resolve_path(knowledge_raw, knowledge_default, workspace_root)
+    index_root = _resolve_path(index_raw, workspace_root / ".nova" / "index", workspace_root)
     
     # Chroma path: default to index_root/chroma
-    chroma_path = _resolve_path(
-        _env_or("NOVA_CHROMA_PATH", search_cfg.get("chroma_path"), None),
-        index_root / "chroma",
-        workspace_root,
-    )
+    chroma_path = _resolve_path(chroma_raw, index_root / "chroma", workspace_root)
 
     # Safety rail: keep index/chroma local to active workspace by default.
     # Explicit opt-out for advanced setups:
@@ -193,14 +192,14 @@ def load_config(workspace_root: Path) -> NovaConfig:
         default_knowledge_root = (workspace_root / "nova-knowledge").resolve()
         default_index_root = (workspace_root / ".nova" / "index").resolve()
 
-        if not _is_within(knowledge_root, workspace_root):
+        if knowledge_raw is None and not _is_within(knowledge_root, workspace_root):
             knowledge_root = default_knowledge_root
 
-        if not _is_within(index_root, workspace_root):
+        if index_raw is None and not _is_within(index_root, workspace_root):
             index_root = default_index_root
 
         # Chroma must stay under index_root, otherwise force default.
-        if not _is_within(chroma_path, index_root):
+        if chroma_raw is None and not _is_within(chroma_path, index_root):
             chroma_path = (index_root / "chroma").resolve()
     
     # Search enabled (default True)

@@ -29,8 +29,13 @@ Wenn der Aufruf fehlschlaegt: Fehler kurz melden und mit bestmoeglichem lokalen 
 Minimaler Startkontext:
 - Regeln/Kernprinzipien
 - Schreib-Scope
-- `CURRENT.md` (Fokus)
+- `CURRENT.md` (Fokus, projektbezogen priorisiert)
 - `TICKETS.md` (Zuordnung/Abrechnung)
+
+Kontext-Aufloesung fuer Fokus (`CURRENT.md`):
+1. Wenn klar ist, dass an einem konkreten Projekt gearbeitet wird: zuerst `projects/.../CURRENT.md` dieses Projekts lesen.
+2. `nova-knowledge/CURRENT.md` bleibt globaler Fallback fuer bereichsuebergreifenden Kontext.
+3. Bei Widerspruechen hat das Projekt-`CURRENT.md` Vorrang fuer Projektentscheidungen.
 
 ## Nicht verhandelbare Regeln
 

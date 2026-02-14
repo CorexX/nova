@@ -1,6 +1,10 @@
 # Current Context
 
-Was arbeitest du gerade? Beschreibe hier:
+Globaler Fokus (nur bereichsuebergreifend, nicht projektspezifisch).
+
+Hinweis:
+- Bei aktiver Projektarbeit gehoert der operative Fokus in `projects/<bereich>/<projekt>/CURRENT.md`.
+- Diese Datei ist der globale Fallback.
 
 ## Aktuelle Aufgabe
 

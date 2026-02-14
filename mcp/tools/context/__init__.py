@@ -13,3 +13,4 @@ from . import get_tickets
 from . import get_collections
 from . import get_paths
 from . import get_agent_skills
+from . import project_resume

@@ -48,7 +48,15 @@ class NovaConfig:
 
     @property
     def principles_md(self) -> Path:
-        return self.core_root / "core" / "PRINCIPLES.md"
+        primary = self.core_root / "core" / "PRINCIPLES.md"
+        if primary.exists():
+            return primary
+
+        fallback = self.core_root / "meta" / "PRINCIPLES.md"
+        if fallback.exists():
+            return fallback
+
+        return primary
 
     @property
     def current_md(self) -> Path:

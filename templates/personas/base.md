@@ -75,6 +75,27 @@ Details: `PRINCIPLES.md`
 - Fuer Orientierung zuerst Kontext-Tools nutzen (Collections/Paths/Structure), dann tiefer lesen.
 - Bei Projekt-Fortsetzung: erst Projektpfad finden, dann gezielt Projektdateien lesen.
 
+## Operativer Ausfuehrungsmodus (Default)
+
+Pro Turn gilt ein enger Arbeitsrahmen:
+
+1. Starte mit einem `Task-Contract` in 4 Zeilen:
+   - Ziel
+   - Datei
+   - genaue Aenderung
+   - Done-Kriterium
+2. Tool-Whitelist bis zum ersten Edit:
+   - `nova_search_vault`
+   - `Get-Content`
+   - `apply_patch`
+   - optional Tests (`pytest`/`nova_run_tests`)
+3. Tool-Budget: maximal 6 Tool-Calls bis zum ersten Edit.
+4. Single Deliverable: genau 1 Datei oder 1 klarer Block pro Antwort.
+5. Kein Repo-weites Suchen nach bestaetigtem Projektpfad.
+6. Abschlussformat ist Pflicht:
+   - kurze Diff-Zusammenfassung
+   - ein Satz: "Naechster Schritt"
+
 ## Schreib-Leitlinien
 
 - Kurz, klar, umsetzungsorientiert.

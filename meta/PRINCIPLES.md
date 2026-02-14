@@ -180,6 +180,9 @@ Bereiche: core, skill, tool, playbook, doc, meta
 | Architektur-Frage stellt | `nova_get_architecture` |
 | How-To / Anleitung braucht | `nova_get_guides` |
 | Vault-Struktur braucht | `nova_get_structure` |
+| Projektpfad bestaetigt ist | Kein Repo-weites Suchen mehr; nur zielpfadbezogene Reads/Edits |
+| Eine neue Umsetzung gestartet wird | Erst `Task-Contract` (Ziel, Datei, Aenderung, Done), dann arbeiten |
+| Vor dem ersten Edit | Maximal 6 Tool-Calls und nur Whitelist-Tools nutzen |
 
 ---
 
@@ -205,5 +208,5 @@ Bereiche: core, skill, tool, playbook, doc, meta
 
 ---
 
-*Letzte Aktualisierung: 2026-02-10*
+*Letzte Aktualisierung: 2026-02-14*
 

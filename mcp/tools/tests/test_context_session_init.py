@@ -1,5 +1,5 @@
-"""
-Tests für context/session_init.py
+﻿"""
+Tests fuer context/session_init.py
 """
 
 import pytest
@@ -23,10 +23,10 @@ from tools.context.session_init import (
 # =============================================================================
 
 class TestToolDefinition:
-    """Tests für die Tool-Definition."""
+    """Tests fuer die Tool-Definition."""
     
     def test_returns_tool_instance(self, tmp_path: Path):
-        """Tool-Definition gibt Tool-Instanz zurück."""
+        """Tool-Definition gibt Tool-Instanz zurueck."""
         tool = get_tool_definition(tmp_path)
         assert isinstance(tool, Tool)
     
@@ -53,7 +53,7 @@ class TestToolDefinition:
 # =============================================================================
 
 class TestExtractSection:
-    """Tests für _extract_section."""
+    """Tests fuer _extract_section."""
     
     def test_extracts_section_until_separator(self):
         """Extrahiert Sektion bis ---."""
@@ -73,14 +73,14 @@ Content here
         assert "Other" not in result
     
     def test_returns_none_for_missing_section(self):
-        """Gibt None für fehlende Sektion."""
+        """Gibt None fuer fehlende Sektion."""
         content = "# Doc\n\n## Other\n\nContent"
         result = _extract_section(content, "Missing")
         assert result is None
 
 
 class TestGetTopPrinciples:
-    """Tests für _get_top_principles."""
+    """Tests fuer _get_top_principles."""
     
     def test_extracts_principles_table(self):
         """Extrahiert Prinzipien-Tabelle."""
@@ -108,7 +108,7 @@ class TestGetTopPrinciples:
 
 
 class TestGetScope:
-    """Tests für _get_scope."""
+    """Tests fuer _get_scope."""
     
     def test_extracts_scope_section(self):
         """Extrahiert Schreib-Scope Sektion."""
@@ -136,7 +136,7 @@ class TestGetScope:
 
 
 class TestGetCorePersona:
-    """Tests für _get_core_persona."""
+    """Tests fuer _get_core_persona."""
     
     def test_extracts_persona(self):
         """Extrahiert Persona-Sektion."""
@@ -174,7 +174,7 @@ Du bist NOVA.
 # =============================================================================
 
 class TestExecute:
-    """Tests für die Tool-Ausführung."""
+    """Tests fuer die Tool-Ausfuehrung."""
     
     @pytest.fixture
     def minimal_workspace(self, tmp_path: Path):
@@ -259,12 +259,12 @@ Du bist NOVA, ein Tech-Kommandant.
     
     @pytest.mark.asyncio
     async def test_returns_text_content(self, minimal_workspace: Path):
-        """Gibt TextContent zurück."""
-        # Mock health check um externe Abhängigkeit zu vermeiden
+        """Gibt TextContent zurueck."""
+        # Mock health check um externe Abhaengigkeit zu vermeiden
         with patch("tools.context.session_init._get_health_check") as mock_health:
             mock_checks = AsyncMock()
             mock_checks.run_grouped_checks = AsyncMock(return_value={})
-            mock_checks.format_grouped_simple = lambda x: "✅ OK"
+            mock_checks.format_grouped_simple = lambda x: "[OK] OK"
             mock_checks.get_actions_from_groups = lambda x: []
             mock_health.return_value = mock_checks
             
@@ -275,11 +275,11 @@ Du bist NOVA, ein Tech-Kommandant.
     
     @pytest.mark.asyncio
     async def test_includes_date_and_week(self, minimal_workspace: Path):
-        """Enthält Datum und Kalenderwoche."""
+        """Enthaelt Datum und Kalenderwoche."""
         with patch("tools.context.session_init._get_health_check") as mock_health:
             mock_checks = AsyncMock()
             mock_checks.run_grouped_checks = AsyncMock(return_value={})
-            mock_checks.format_grouped_simple = lambda x: "✅ OK"
+            mock_checks.format_grouped_simple = lambda x: "[OK] OK"
             mock_checks.get_actions_from_groups = lambda x: []
             mock_health.return_value = mock_checks
             
@@ -291,11 +291,11 @@ Du bist NOVA, ein Tech-Kommandant.
     
     @pytest.mark.asyncio
     async def test_includes_persona(self, minimal_workspace: Path):
-        """Enthält Persona aus CORE.md."""
+        """Enthaelt Persona aus CORE.md."""
         with patch("tools.context.session_init._get_health_check") as mock_health:
             mock_checks = AsyncMock()
             mock_checks.run_grouped_checks = AsyncMock(return_value={})
-            mock_checks.format_grouped_simple = lambda x: "✅ OK"
+            mock_checks.format_grouped_simple = lambda x: "[OK] OK"
             mock_checks.get_actions_from_groups = lambda x: []
             mock_health.return_value = mock_checks
             
@@ -308,11 +308,11 @@ Du bist NOVA, ein Tech-Kommandant.
     
     @pytest.mark.asyncio
     async def test_includes_principles(self, minimal_workspace: Path):
-        """Enthält Kernprinzipien."""
+        """Enthaelt Kernprinzipien."""
         with patch("tools.context.session_init._get_health_check") as mock_health:
             mock_checks = AsyncMock()
             mock_checks.run_grouped_checks = AsyncMock(return_value={})
-            mock_checks.format_grouped_simple = lambda x: "✅ OK"
+            mock_checks.format_grouped_simple = lambda x: "[OK] OK"
             mock_checks.get_actions_from_groups = lambda x: []
             mock_health.return_value = mock_checks
             
@@ -323,11 +323,11 @@ Du bist NOVA, ein Tech-Kommandant.
     
     @pytest.mark.asyncio
     async def test_includes_scope(self, minimal_workspace: Path):
-        """Enthält Schreib-Scope."""
+        """Enthaelt Schreib-Scope."""
         with patch("tools.context.session_init._get_health_check") as mock_health:
             mock_checks = AsyncMock()
             mock_checks.run_grouped_checks = AsyncMock(return_value={})
-            mock_checks.format_grouped_simple = lambda x: "✅ OK"
+            mock_checks.format_grouped_simple = lambda x: "[OK] OK"
             mock_checks.get_actions_from_groups = lambda x: []
             mock_health.return_value = mock_checks
             
@@ -337,11 +337,11 @@ Du bist NOVA, ein Tech-Kommandant.
     
     @pytest.mark.asyncio
     async def test_includes_current_focus(self, minimal_workspace: Path):
-        """Enthält aktuellen Fokus aus CURRENT.md."""
+        """Enthaelt aktuellen Fokus aus CURRENT.md."""
         with patch("tools.context.session_init._get_health_check") as mock_health:
             mock_checks = AsyncMock()
             mock_checks.run_grouped_checks = AsyncMock(return_value={})
-            mock_checks.format_grouped_simple = lambda x: "✅ OK"
+            mock_checks.format_grouped_simple = lambda x: "[OK] OK"
             mock_checks.get_actions_from_groups = lambda x: []
             mock_health.return_value = mock_checks
             
@@ -367,11 +367,11 @@ Du bist NOVA, ein Tech-Kommandant.
 
     @pytest.mark.asyncio
     async def test_includes_startklar(self, minimal_workspace: Path):
-        """Enthält Startklar-Marker."""
+        """Enthaelt Startklar-Marker."""
         with patch("tools.context.session_init._get_health_check") as mock_health:
             mock_checks = AsyncMock()
             mock_checks.run_grouped_checks = AsyncMock(return_value={})
-            mock_checks.format_grouped_simple = lambda x: "✅ OK"
+            mock_checks.format_grouped_simple = lambda x: "[OK] OK"
             mock_checks.get_actions_from_groups = lambda x: []
             mock_health.return_value = mock_checks
             
@@ -387,7 +387,7 @@ Du bist NOVA, ein Tech-Kommandant.
         with patch("tools.context.session_init._get_health_check") as mock_health:
             mock_checks = AsyncMock()
             mock_checks.run_grouped_checks = AsyncMock(return_value={})
-            mock_checks.format_grouped_simple = lambda x: "✅ OK"
+            mock_checks.format_grouped_simple = lambda x: "[OK] OK"
             mock_checks.get_actions_from_groups = lambda x: []
             mock_health.return_value = mock_checks
             
@@ -409,17 +409,17 @@ Du bist NOVA, ein Tech-Kommandant.
 
     @pytest.mark.asyncio
     async def test_auto_index_runs_when_search_enabled(self, minimal_workspace: Path):
-        """Führt Auto-Indexing aus wenn Search aktiviert ist."""
+        """Fuehrt Auto-Indexing aus wenn Search aktiviert ist."""
         mock_index_tool = AsyncMock()
         mock_index_tool.execute = AsyncMock(
-            return_value=[TextContent(type="text", text="✅ Index aktualisiert\n\n| Metrik | Wert |")]
+            return_value=[TextContent(type="text", text="[OK] Index aktualisiert\n\n| Metrik | Wert |")]
         )
 
         with patch("tools.context.session_init._get_index_vault", return_value=mock_index_tool):
             with patch("tools.context.session_init._get_health_check") as mock_health:
                 mock_checks = AsyncMock()
                 mock_checks.run_grouped_checks = AsyncMock(return_value={})
-                mock_checks.format_grouped_simple = lambda x: "✅ OK"
+                mock_checks.format_grouped_simple = lambda x: "[OK] OK"
                 mock_checks.get_actions_from_groups = lambda x: []
                 mock_health.return_value = mock_checks
 
@@ -427,11 +427,11 @@ Du bist NOVA, ein Tech-Kommandant.
 
         mock_index_tool.execute.assert_awaited_once_with({"force": False}, minimal_workspace)
         assert "## Index Status" in result[0].text
-        assert "✅ Auto-Index: aktualisiert (inkrementell)" in result[0].text
+        assert "[OK] Auto-Index: aktualisiert (inkrementell)" in result[0].text
 
     @pytest.mark.asyncio
     async def test_auto_index_skipped_when_search_disabled(self, minimal_workspace: Path):
-        """Überspringt Auto-Indexing wenn Search deaktiviert ist."""
+        """Ueberspringt Auto-Indexing wenn Search deaktiviert ist."""
         fake_paths = SimpleNamespace(
             knowledge_root=minimal_workspace / "nova-knowledge",
             core_md=minimal_workspace / "nova-core" / "core" / "CORE.md",
@@ -444,7 +444,7 @@ Du bist NOVA, ein Tech-Kommandant.
                 with patch("tools.context.session_init._get_health_check") as mock_health:
                     mock_checks = AsyncMock()
                     mock_checks.run_grouped_checks = AsyncMock(return_value={})
-                    mock_checks.format_grouped_simple = lambda x: "✅ OK"
+                    mock_checks.format_grouped_simple = lambda x: "[OK] OK"
                     mock_checks.get_actions_from_groups = lambda x: []
                     mock_health.return_value = mock_checks
 
@@ -452,7 +452,7 @@ Du bist NOVA, ein Tech-Kommandant.
 
         mock_get_index.assert_not_called()
         assert "## Index Status" in result[0].text
-        assert "Indexing übersprungen (search.enabled=false)" in result[0].text
+        assert "Indexing uebersprungen (search.enabled=false)" in result[0].text
 
     @pytest.mark.asyncio
     async def test_auto_index_failure_is_non_blocking(self, minimal_workspace: Path):
@@ -461,29 +461,31 @@ Du bist NOVA, ein Tech-Kommandant.
             with patch("tools.context.session_init._get_health_check") as mock_health:
                 mock_checks = AsyncMock()
                 mock_checks.run_grouped_checks = AsyncMock(return_value={})
-                mock_checks.format_grouped_simple = lambda x: "✅ OK"
+                mock_checks.format_grouped_simple = lambda x: "[OK] OK"
                 mock_checks.get_actions_from_groups = lambda x: []
                 mock_health.return_value = mock_checks
 
                 result = await execute({}, minimal_workspace)
 
         assert "## Index Status" in result[0].text
-        assert "⚠️ Auto-Index fehlgeschlagen: RuntimeError" in result[0].text
+        assert "[WARN] Auto-Index fehlgeschlagen: RuntimeError" in result[0].text
         assert "Startklar" in result[0].text
         assert "## System Status" in result[0].text
 
     @pytest.mark.asyncio
     async def test_health_check_still_runs_after_index_failure(self, minimal_workspace: Path):
-        """Health-Check läuft auch wenn Auto-Indexing fehlschlägt."""
+        """Health-Check laeuft auch wenn Auto-Indexing fehlschlaegt."""
         with patch("tools.context.session_init._get_index_vault", side_effect=Exception("index failed")):
             with patch("tools.context.session_init._get_health_check") as mock_health:
                 mock_checks = AsyncMock()
                 mock_checks.run_grouped_checks = AsyncMock(return_value={"SEARCH": []})
-                mock_checks.format_grouped_simple = lambda x: "✅ Health läuft"
+                mock_checks.format_grouped_simple = lambda x: "[OK] Health laeuft"
                 mock_checks.get_actions_from_groups = lambda x: []
                 mock_health.return_value = mock_checks
 
                 result = await execute({}, minimal_workspace)
 
         mock_checks.run_grouped_checks.assert_awaited_once_with(minimal_workspace)
-        assert "✅ Health läuft" in result[0].text
+        assert "[OK] Health laeuft" in result[0].text
+
+

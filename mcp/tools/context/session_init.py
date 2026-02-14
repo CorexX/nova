@@ -1,13 +1,13 @@
 ﻿"""
 Tool: Session Init
-Liefert minimalen aber vollstÃ¤ndigen Kontext fÃ¼r den Session-Start.
+Liefert minimalen aber vollstaendigen Kontext fuer den Session-Start.
 
-LÃ¤dt aus CORE.md:
+Laedt aus CORE.md:
 - Persona (Ton, Stil, Signature-Phrasen)
 - Session-Start Workflow
 - Arbeitsablauf
 
-LÃ¤dt aus PRINCIPLES.md (Single Source of Truth):
+Laedt aus PRINCIPLES.md (Single Source of Truth):
 - Kernprinzipien (Top 4)
 - Schreib-Scope
 - Lade-Regeln (Lazy Loading Trigger)
@@ -25,7 +25,7 @@ from pathlib import Path
 from mcp.types import Tool, TextContent
 from ..paths import resolve_paths
 
-# Lazy imports (vermeidet zirkulÃ¤re Imports)
+# Lazy imports (vermeidet zirkulaere Imports)
 _index_vault_module = None
 _health_check_module = None
 
@@ -67,11 +67,11 @@ def _list_top_level_collections(knowledge_root: Path) -> list[str]:
 # =============================================================================
 
 def get_tool_definition(workspace_root: Path) -> Tool:
-    """Gibt die Tool-Definition zurÃ¼ck."""
+    """Gibt die Tool-Definition zurueck."""
     return Tool(
         name="nova_session_init",
         description=(
-            "LÃ¤dt minimalen Session-Kontext: Regeln, Scope, Fokus, Tickets. "
+            "Laedt minimalen Session-Kontext: Regeln, Scope, Fokus, Tickets. "
             "PFLICHT am Anfang jeder Session. Ohne diesen Aufruf fehlt der Kontext."
         ),
         inputSchema={
@@ -87,7 +87,7 @@ def get_tool_definition(workspace_root: Path) -> Tool:
 # =============================================================================
 
 def _extract_section(content: str, header: str) -> str | None:
-    """Extrahiert eine Sektion aus Markdown (bis zum nÃ¤chsten ---)."""
+    """Extrahiert eine Sektion aus Markdown (bis zum naechsten ---)."""
     pattern = rf"(## {header}.*?)(?=\n---|\n## |\Z)"
     match = re.search(pattern, content, re.DOTALL)
     return match.group(1).strip() if match else None
@@ -98,13 +98,13 @@ def _get_top_principles(content: str) -> str:
     match = re.search(r"(\| # \| Prinzip.*?)(?=\n\n|\n###)", content, re.DOTALL)
     if match:
         return "## Kernprinzipien\n\n" + match.group(1).strip()
-    return "âŒ Kernprinzipien nicht gefunden"
+    return "[ERR] Kernprinzipien nicht gefunden"
 
 
 def _get_scope(content: str) -> str:
     """Extrahiert Schreib-Scope Tabelle."""
     section = _extract_section(content, "Schreib-Scope")
-    return section if section else "âŒ Schreib-Scope nicht gefunden"
+    return section if section else "[ERR] Schreib-Scope nicht gefunden"
 
 
 def _get_load_rules(content: str) -> str:
@@ -117,7 +117,7 @@ def _get_load_rules(content: str) -> str:
     )
     if match:
         return match.group(1).strip()
-    return "âŒ Lade-Regeln nicht gefunden"
+    return "[ERR] Lade-Regeln nicht gefunden"
 
 
 def _get_core_persona(content: str) -> str:
@@ -142,7 +142,7 @@ def _get_core_persona(content: str) -> str:
 
     if blocks:
         return "\n\n".join(blocks)
-    return "âŒ Persona nicht gefunden"
+    return "[ERR] Persona nicht gefunden"
 
 
 def _get_core_session_start(content: str) -> str:
@@ -187,13 +187,13 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
             sections.append(persona)
             sections.append("")
         
-        # Session-Start (optional, fÃ¼r Erinnerung)
+        # Session-Start (optional, fuer Erinnerung)
         session_start = _get_core_session_start(core_content)
         if session_start:
             sections.append(session_start)
             sections.append("")
     else:
-        sections.append("âŒ CORE.md nicht gefunden\n")
+        sections.append("[ERR] CORE.md nicht gefunden\n")
     
     # --- Aus PRINCIPLES.md laden ---
     if principles_path.exists():
@@ -211,7 +211,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         sections.append(_get_load_rules(principles))
         sections.append("")
     else:
-        sections.append("âŒ PRINCIPLES.md nicht gefunden\n")
+        sections.append("[ERR] PRINCIPLES.md nicht gefunden\n")
     
     # --- CURRENT.md (Fokus) ---
     current_path = knowledge_root / "CURRENT.md"
@@ -255,7 +255,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
 
     # --- Auto-Indexing (inkrementell, non-blocking) ---
     if not paths.search_enabled:
-        index_status = "⏭️ Indexing übersprungen (search.enabled=false)"
+        index_status = "[SKIP] Indexing uebersprungen (search.enabled=false)"
     else:
         try:
             index_tool = _get_index_vault()
@@ -264,16 +264,16 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
             if index_result and getattr(index_result[0], "text", None):
                 index_text = index_result[0].text
 
-            if "✅ Index aktualisiert" in index_text:
-                index_status = "✅ Auto-Index: aktualisiert (inkrementell)"
+            if "Index aktualisiert" in index_text:
+                index_status = "[OK] Auto-Index: aktualisiert (inkrementell)"
             else:
                 first_line = next((line.strip() for line in index_text.splitlines() if line.strip()), None)
                 if first_line:
-                    index_status = f"ℹ️ Auto-Index: {first_line}"
+                    index_status = f"[INFO] Auto-Index: {first_line}"
                 else:
-                    index_status = "ℹ️ Auto-Index: keine Statusmeldung"
+                    index_status = "[INFO] Auto-Index: keine Statusmeldung"
         except Exception as e:
-            index_status = f"⚠️ Auto-Index fehlgeschlagen: {type(e).__name__}"
+            index_status = f"[WARN] Auto-Index fehlgeschlagen: {type(e).__name__}"
 
     sections.append("")
     sections.append("## Index Status")
@@ -287,17 +287,18 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         groups = await checks.run_grouped_checks(workspace_root)
         health_status = "## System Status\n" + checks.format_grouped_simple(groups)
         
-        # Aktionen hinzufÃ¼gen wenn nÃ¶tig
+        # Aktionen hinzufuegen wenn noetig
         actions = checks.get_actions_from_groups(groups)
         if actions:
             health_status += "\n\n**Action Required:**\n" + "\n".join(actions)
     except Exception as e:
-        health_status = f"## System Status\nâš ï¸ Health-Check fehlgeschlagen: {type(e).__name__}"
+        health_status = f"## System Status\n[WARN] Health-Check fehlgeschlagen: {type(e).__name__}"
     
     sections.append(f"\n---\n{health_status}")
-    sections.append("\nâœ“ Startklar")
+    sections.append("\n[OK] Startklar")
     
     result = "\n".join(sections)
     
     return [TextContent(type="text", text=result)]
+
 

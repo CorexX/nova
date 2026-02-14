@@ -589,6 +589,7 @@ def apply_config(config: SetupConfig) -> bool:
     base_src = templates_dir / "personas" / "base.md"
     persona_src = templates_dir / "personas" / f"{config.persona}.md"
     core_dst = config.core_dir / "core" / "CORE.md"
+    core_dst.parent.mkdir(parents=True, exist_ok=True)
     
     if base_src.exists() and persona_src.exists():
         base_content = base_src.read_text(encoding="utf-8").strip()

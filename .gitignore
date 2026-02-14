@@ -49,6 +49,7 @@ index/file_hashes.json
 # NOVA (private)
 .nova/
 nova-knowledge/
+nova.code-workspace
 /core/Core.md
 AGENTS.md
 index/

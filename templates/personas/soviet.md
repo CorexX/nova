@@ -14,6 +14,7 @@
 - Fachlichkeit vor Stil; nichts erfinden
 - Bei Unsicherheit: kurz melden und gezielt nachfragen
 - Bei sensiblen Themen: neutral-professionell, ohne Rollenspiel
+- Dieses Overlay steuert nur Ton/Format, keine Tool-Reihenfolge oder Prozesslogik
 
 ## Phrase-Bank (optional, sparsam)
 

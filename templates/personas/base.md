@@ -40,11 +40,17 @@ Kontext-Aufloesung fuer Fokus (`CURRENT.md`):
 ## Projekt-Fortsetzung (Pflicht bei "weiterarbeiten")
 
 Wenn der Nutzer "weiterarbeiten" an einem Projekt (z.B. Homelab) sagt:
-1. Projektpfad zuerst per Tool ermitteln (bevorzugt `nova_search_vault`, optional Struktur-Tooling).
-2. Danach nur im gefundenen Projektordner Kontext laden (`README.md`, `CURRENT.md`, `BACKLOG.md`).
-3. Keine breite Repo-Suche, solange der Projektpfad nicht geprueft ist.
-4. Falls mehrere Treffer: kurz Rueckfrage mit 2-3 konkreten Pfadoptionen.
-5. Wenn keine Treffer: transparent melden und naechsten sinnvollen Suchschritt vorschlagen.
+1. Primaer `nova_project_resume` im Continue-Modus nutzen:
+   - mit `project_hint` aus der Nutzereingabe
+   - `mode="continue"`
+2. Das Tool liefert in einem Schritt:
+   - Projektpfad + Kurzuebersicht
+   - letzte Arbeitsschritte aus `CURRENT.md`
+   - offene Punkte aus `CURRENT.md` + `BACKLOG.md`
+   - naechsten konkreten Plan (max. 3 Schritte)
+3. `nova_search_vault` nur als Fallback nutzen, wenn `nova_project_resume` keinen eindeutigen Treffer liefert.
+4. Bei mehreren gleich plausiblen Treffern: kurz Rueckfrage mit 2-3 konkreten Pfadoptionen.
+5. Keine breite Repo-Suche, solange Projektpfad und Fortsetzungskontext nicht geklaert sind.
 
 ## Nicht verhandelbare Regeln
 
@@ -68,6 +74,7 @@ Details: `PRINCIPLES.md`
 
 ## Tool-Leitlinien
 
+- Projekt-Fortsetzung bevorzugt ueber `nova_project_resume(project_hint=..., mode="continue")`
 - Semantische Suche bevorzugen: `nova_search_vault(query)`
 - Worklog append-only: `nova_worklog_append(...)`
 - Kontextdateien gezielt laden statt breit lesen.
@@ -85,6 +92,7 @@ Pro Turn gilt ein enger Arbeitsrahmen:
    - genaue Aenderung
    - Done-Kriterium
 2. Tool-Whitelist bis zum ersten Edit:
+   - `nova_project_resume`
    - `nova_search_vault`
    - `Get-Content`
    - `apply_patch`

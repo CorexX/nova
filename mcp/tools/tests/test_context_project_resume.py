@@ -25,6 +25,7 @@ class TestExecute:
     def workspace(self, tmp_path: Path) -> Path:
         (tmp_path / "nova-core" / "core").mkdir(parents=True)
         (tmp_path / "nova-knowledge" / "my-space" / "homelab" / "knowledge").mkdir(parents=True)
+        (tmp_path / "nova-knowledge" / "projects" / "internal" / "homelab").mkdir(parents=True)
 
         (tmp_path / "nova-core" / "core" / "CORE.md").write_text("# CORE", encoding="utf-8")
         (tmp_path / "nova-knowledge" / "my-space" / "homelab" / "README.md").write_text(
@@ -35,6 +36,15 @@ class TestExecute:
         )
         (tmp_path / "nova-knowledge" / "my-space" / "homelab" / "knowledge" / "commands-runbook.md").write_text(
             "# Commands", encoding="utf-8"
+        )
+        (tmp_path / "nova-knowledge" / "projects" / "internal" / "homelab" / "README.md").write_text(
+            "# Homelab README", encoding="utf-8"
+        )
+        (tmp_path / "nova-knowledge" / "projects" / "internal" / "homelab" / "CURRENT.md").write_text(
+            "## In Progress\n- [x] done", encoding="utf-8"
+        )
+        (tmp_path / "nova-knowledge" / "projects" / "internal" / "homelab" / "BACKLOG.md").write_text(
+            "## Now\n- [ ] todo", encoding="utf-8"
         )
 
         return tmp_path
@@ -79,3 +89,36 @@ class TestExecute:
         assert "Auto-Discovery" in text
         assert "README.md" in text
         assert "CURRENT.md" in text
+
+    @pytest.mark.asyncio
+    async def test_resolves_project_by_hint(self, workspace: Path):
+        result = await execute(
+            {
+                "project_hint": "homlab",
+                "include_session_init": False,
+                "mode": "bundle",
+                "documents": ["README.md"],
+            },
+            workspace,
+        )
+        text = result[0].text
+        assert "Zielpfad:" in text
+        assert "homelab" in text
+        assert "README.md" in text
+
+    @pytest.mark.asyncio
+    async def test_continue_mode_returns_structured_report(self, workspace: Path):
+        result = await execute(
+            {
+                "path": "my-space/homelab",
+                "include_session_init": False,
+                "mode": "continue",
+            },
+            workspace,
+        )
+        text = result[0].text
+        assert "Continue Report" in text
+        assert "Kurzuebersicht" in text
+        assert "Letzte Arbeitsschritte" in text
+        assert "Offene Punkte" in text
+        assert "Naechster Konkreter Plan" in text

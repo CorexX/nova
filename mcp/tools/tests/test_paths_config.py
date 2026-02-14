@@ -50,3 +50,17 @@ class TestConfigFileResolution:
 
         cfg = load_config(tmp_path)
         assert cfg.config_file == local_cfg
+
+
+class TestPrinciplesPathFallback:
+    """PRINCIPLES.md wird kompatibel aus core/ oder meta/ geladen."""
+
+    def test_uses_meta_principles_when_core_principles_missing(self, tmp_path: Path):
+        (tmp_path / "mcp").mkdir()
+        (tmp_path / "core").mkdir()
+        (tmp_path / "meta").mkdir()
+        (tmp_path / "meta" / "PRINCIPLES.md").write_text("# Principles", encoding="utf-8")
+
+        cfg = load_config(tmp_path)
+
+        assert cfg.principles_md == (tmp_path / "meta" / "PRINCIPLES.md")

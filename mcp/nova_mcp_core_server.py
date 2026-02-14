@@ -53,6 +53,7 @@ from tools.context import (
     get_collections,
     get_paths,
     get_agent_skills,
+    project_resume,
 )
 from tools.search import index_vault, search_vault
 from tools.health import health_check
@@ -123,6 +124,7 @@ TOOLS = {
     "nova_get_collections": get_collections,
     "nova_get_paths": get_paths,
     "nova_get_agent_skills": get_agent_skills,
+    "nova_project_resume": project_resume,
     # Search Tools
     "nova_index_vault": index_vault,
     "nova_search_vault": search_vault,

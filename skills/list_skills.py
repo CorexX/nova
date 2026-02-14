@@ -25,7 +25,7 @@ SKILLS = [
     {
         "name": "nova_git_push_repos",
         "category": "git",
-        "description": "Pushed alle Git-Repos im Workspace",
+        "description": "Pushed alle Git-Repos im Workspace (derzeit defekt)",
         "tags": ["git", "automation"],
     },
     {

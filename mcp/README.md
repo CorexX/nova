@@ -101,7 +101,7 @@ nova-core/
 |------|-----------|--------------|
 | `nova_session_init` | context | Lädt Session-Kontext (PFLICHT am Start) |
 | `nova_health_check` | health | Detaillierter System-Status Report |
-| `nova_git_push_repos` | git | Pushed alle Git-Repos im Workspace |
+| `nova_git_push_repos` | git | Pushed alle Git-Repos im Workspace (derzeit defekt) |
 | `nova_worklog_append` | worklog | Fügt Eintrag zum WORKLOG.md hinzu |
 | `nova_run_tests` | testing | Führt pytest für Tool-Tests aus |
 | `nova_search_vault` | search | Semantische Suche in der Vault |

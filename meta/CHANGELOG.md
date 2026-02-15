@@ -22,6 +22,23 @@
 
 ---
 
+## [2026-02-15] - Remove test operation from nova_system_maintain
+
+### Changed
+- `mcp/tools/v2/system_maintain.py`: `operation=\"test\"` aus public MCP API entfernt.
+- `nova_system_maintain` unterstuetzt jetzt nur noch `health`, `index`, `restart`.
+- Unsupported operations liefern jetzt klare Meldung mit erlaubten Werten.
+
+### Documentation
+- `mcp/README.md` aktualisiert: `nova_system_maintain` zeigt nur noch `(health, index, restart)`.
+- Migration-Hinweis ergaenzt: Testausfuehrung ueber `nova_run_tests`.
+
+### Migration
+- Breaking change: `nova_system_maintain(operation=\"test\")` ist nicht mehr verfuegbar.
+- Ersatz: `nova_run_tests` mit optionalem `pattern`.
+
+---
+
 ## [2026-02-13] - Documentation sync for current core state
 
 ### Changed

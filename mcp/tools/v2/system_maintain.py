@@ -34,24 +34,19 @@ def _log(message: str) -> None:
 def get_tool_definition(workspace_root: Path) -> Tool:
     return Tool(
         name="nova_system_maintain",
-        description="Fuehrt Betriebsaufgaben aus: health, index, test oder restart.",
+        description="Fuehrt Betriebsaufgaben aus: health, index oder restart.",
         inputSchema={
             "type": "object",
             "properties": {
                 "operation": {
                     "type": "string",
-                    "enum": ["health", "index", "test", "restart"],
+                    "enum": ["health", "index", "restart"],
                     "description": "Gewuenschte Wartungsoperation",
                 },
                 "force": {
                     "type": "boolean",
                     "description": "Optional fuer index: full rebuild",
                     "default": False,
-                },
-                "pattern": {
-                    "type": "string",
-                    "description": "Optional fuer test: pytest -k pattern",
-                    "default": "",
                 },
                 "delay_seconds": {
                     "type": "integer",
@@ -292,28 +287,6 @@ async def _run_index(args: dict, workspace_root: Path) -> dict:
     }
 
 
-async def _run_tests(args: dict, workspace_root: Path) -> dict:
-    from ..testing import run_tests
-
-    payload = {
-        "pattern": str(args.get("pattern", "")).strip(),
-        "verbose": False,
-        "failfast": False,
-    }
-    result = await run_tests.execute(payload, workspace_root)
-    text = result[0].text if result else ""
-    text_upper = text.upper()
-    status = "ok"
-    if "FAILED" in text_upper or "ERROR" in text_upper or "TIMEOUT" in text_upper:
-        status = "warning"
-    return {
-        "status": status,
-        "operation": "test",
-        "details": {"raw": text},
-        "artifacts": [],
-    }
-
-
 async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     _ = resolve_paths(workspace_root)
     op = str(args.get("operation", "")).strip().lower()
@@ -322,15 +295,13 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         payload = await _run_health(workspace_root)
     elif op == "index":
         payload = await _run_index(args, workspace_root)
-    elif op == "test":
-        payload = await _run_tests(args, workspace_root)
     elif op == "restart":
         payload = _schedule_restart(int(args.get("delay_seconds", 2)))
     else:
         payload = {
             "status": "error",
             "operation": op,
-            "details": {"message": "Unsupported operation"},
+            "details": {"message": "Unsupported operation. Allowed: health, index, restart"},
             "artifacts": [],
         }
 

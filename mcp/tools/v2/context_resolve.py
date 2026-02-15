@@ -46,33 +46,6 @@ def _path_in_scope(path: str, scope: list[str]) -> bool:
     return any(s.lower() in path_l for s in scope)
 
 
-def _fallback_context(knowledge_root: Path, query: str, scope: list[str], top_k: int) -> list[dict]:
-    terms = [t.lower() for t in query.split() if len(t) > 2]
-    results: list[dict] = []
-    for md in sorted(knowledge_root.rglob("*.md")):
-        rel = md.as_posix()
-        if not _path_in_scope(rel, scope):
-            continue
-        try:
-            content = md.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            continue
-        low = content.lower()
-        score_raw = sum(low.count(t) for t in terms)
-        if score_raw == 0:
-            continue
-        results.append(
-            {
-                "path": rel,
-                "score": min(0.99, 0.2 + (score_raw / 20.0)),
-                "snippet": short_snippet(content),
-                "reason": "keyword_overlap_fallback",
-            }
-        )
-    results.sort(key=lambda x: x["score"], reverse=True)
-    return results[:top_k]
-
-
 async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     log = tool_logger("context_resolve")
     cfg = resolve_paths(workspace_root)
@@ -84,37 +57,46 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         return [TextContent(type="text", text=json_text({"status": "error", "message": "query is required"}))]
 
     top_k = max(3, min(12, token_budget // 180))
+    if not cfg.search_enabled:
+        payload = {
+            "status": "error",
+            "message": "Semantische Suche ist deaktiviert (search_enabled=false).",
+            "query": query,
+            "project_hint": project_hint or None,
+        }
+        return [TextContent(type="text", text=json_text(payload))]
+
+    try:
+        results = semantic_search(str(cfg.chroma_path), query, top_k * 2, log)
+    except Exception as exc:
+        log(f"Search failed: {exc}")
+        payload = {
+            "status": "error",
+            "message": f"Semantische Suche fehlgeschlagen ({type(exc).__name__}): {exc}",
+            "query": query,
+            "project_hint": project_hint or None,
+        }
+        return [TextContent(type="text", text=json_text(payload))]
+
     items: list[dict] = []
-    used_search = False
-
-    # Synchronous search - no thread pool
-    if cfg.search_enabled:
-        try:
-            results = semantic_search(str(cfg.chroma_path), query, top_k * 2, log)
-            seen: set[str] = set()
-            for item in results:
-                meta = item.get("meta") or {}
-                path = str(item.get("path") or meta.get("path") or "")
-                if not path or path in seen or not _path_in_scope(path, scope):
-                    continue
-                seen.add(path)
-                distance = float(item.get("distance", 1.0))
-                score = float(max(0.0, 1.0 - distance))
-                doc = str(item.get("doc") or item.get("text") or "")
-                items.append({
-                    "path": path,
-                    "score": round(score, 4),
-                    "snippet": short_snippet(doc),
-                    "reason": "semantic_match",
-                })
-                if len(items) >= top_k:
-                    break
-            used_search = bool(items)
-        except Exception as e:
-            log(f"Search failed: {e}")
-
-    if not items:
-        items = _fallback_context(cfg.knowledge_root, query, scope, top_k)
+    seen: set[str] = set()
+    for item in results:
+        meta = item.get("meta") or {}
+        path = str(item.get("path") or meta.get("path") or "")
+        if not path or path in seen or not _path_in_scope(path, scope):
+            continue
+        seen.add(path)
+        distance = float(item.get("distance", 1.0))
+        score = float(max(0.0, 1.0 - distance))
+        doc = str(item.get("doc") or item.get("text") or "")
+        items.append({
+            "path": path,
+            "score": round(score, 4),
+            "snippet": short_snippet(doc),
+            "reason": "semantic_match",
+        })
+        if len(items) >= top_k:
+            break
 
     if project_hint:
         hint_l = project_hint.lower()
@@ -138,7 +120,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     payload = {
         "query": query,
         "project_hint": project_hint or None,
-        "selection_reason": "semantic_search" if used_search else "fallback_keyword_scan",
+        "selection_reason": "semantic_search",
         "confidence": confidence,
         "token_budget": token_budget,
         "context_items": context_items,

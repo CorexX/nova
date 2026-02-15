@@ -13,16 +13,27 @@
 
 ### Struktur
 ```
-NOVA/
-├── nova-core/          # Framework (public) - Code, Skills, Regeln
-│   ├── core/CORE.md    # Agent-Grundregeln
-│   ├── skills/         # CLI-Skripte (eigenständig)
-│   ├── mcp/            # MCP Server + Tool-Adapter
-│   └── playbooks/      # Workflows (close_day, etc.)
-└── nova-knowledge/     # Daten (privat) - Arbeit, Kunden, Wissen
-    ├── WORKLOG.md      # Append-only Arbeitslog
-    ├── TICKETS.md      # Budgets, Zeiterfassung
-    └── kunden/         # Kundenprojekte
+NOVA/                   # Framework (public) - Code, Skills, Regeln
+├── core/CORE.md        # Agent-Grundregeln (generiert aus templates/)
+├── mcp/                # MCP Server + Tool-Adapter
+│   └── tools/          # 11 Tool-Module
+├── skills/             # CLI-Skripte (eigenständig)
+├── playbooks/          # Workflows (close_day, etc.)
+├── templates/          # Source of Truth für Personas + Projekt-Templates
+│   ├── personas/       # base.md + persona overlays
+│   └── knowledge/      # CURRENT.md, TICKETS.md, WORKLOG.md
+└── meta/               # Framework-Dokumentation
+    ├── ARCHITECTURE.md # Diese Datei
+    ├── PRINCIPLES.md   # Kernprinzipien
+    ├── ROADMAP.md      # Entwicklungsplanung
+    └── SYSTEM.md       # System-Übersicht
+
+nova-knowledge/         # Daten (privat) - Arbeit, Kunden, Wissen
+├── WORKLOG.md          # Append-only Arbeitslog
+├── CURRENT.md          # Aktueller Fokus
+├── TICKETS.md          # Budgets, Zeiterfassung
+├── projects/           # Kundenprojekte + Interne Projekte
+└── resources/          # Guides, Decisions, Templates
 ```
 
 ### Schichten
@@ -44,16 +55,18 @@ Persistence  → Markdown + Git
 - ✅ `nova-knowledge/WORKLOG.md` (append)
 - ✅ `nova-knowledge/CURRENT.md`, `TICKETS.md` (edit)
 - ✅ `**/knowledge/*.md` (neue Dateien)
-- ❌ `nova-core/**` (Code)
+- ❌ `NOVA/**` (Framework-Code)
 - ❌ Bestehende Notes überschreiben
 
-### Tools
+### MCP Tools (Kern)
 | Tool | Funktion |
 |------|----------|
-| `nova_worklog_append` | Eintrag zu WORKLOG.md |
-| `nova_git_push_repos` | Repos pushen |
-| `nova_run_tests` | pytest ausführen |
-| `nova_get_architecture` | Diese Übersicht |
+| `nova_context_resolve` | Kontext selektiv auflösen |
+| `nova_project_continue` | Projekt fortsetzen |
+| `nova_project_create` | Neues Projekt anlegen |
+| `nova_knowledge_query` | Semantische Wissenssuche |
+| `nova_knowledge_update` | Erkenntnisse persistieren |
+| `nova_system_maintain` | System-Health, Index, Restart |
 
 <!-- COMPACT_END -->
 

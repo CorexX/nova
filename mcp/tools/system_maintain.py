@@ -14,8 +14,8 @@ from typing import Any
 
 from mcp.types import TextContent, Tool
 
-from ..paths import resolve_paths
-from ..search.shared import batch_encode_texts
+from .paths import resolve_paths
+from .search_shared import batch_encode_texts
 from .common import json_text
 
 _BACKEND_LOCK = threading.Lock()
@@ -126,7 +126,7 @@ def _schedule_restart(delay_seconds: int) -> dict:
 
 
 async def _run_health(workspace_root: Path) -> dict:
-    from ..health.checks import format_grouped_simple, run_grouped_checks
+    from .health_checks import format_grouped_simple, run_grouped_checks
 
     groups = await run_grouped_checks(workspace_root)
     return {

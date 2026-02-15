@@ -34,7 +34,7 @@ def load_model_in_background():
             # Capture stdout/stderr von HuggingFace/MLX
             with contextlib.redirect_stdout(io.StringIO()), \
                  contextlib.redirect_stderr(io.StringIO()):
-                from tools.search.shared import get_model
+                from tools.search_shared import get_model
                 model = get_model()
         
         elapsed = time.time() - start
@@ -65,7 +65,7 @@ def main():
     # Test: Model sollte gecached sein
     print(f"[{time.strftime('%H:%M:%S')}] 🔍 Testing cached model...", flush=True)
     start = time.time()
-    from tools.search.shared import get_model
+    from tools.search_shared import get_model
     model = get_model()
     print(f"[{time.strftime('%H:%M:%S')}] ✅ Cached access: {time.time()-start:.3f}s", flush=True)
 

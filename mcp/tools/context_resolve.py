@@ -6,8 +6,8 @@ from pathlib import Path
 
 from mcp.types import TextContent, Tool
 
-from ..paths import resolve_paths
-from ..search.shared import tool_logger, semantic_search
+from .paths import resolve_paths
+from .search_shared import tool_logger, semantic_search
 from .common import json_text, rel_or_abs, short_snippet
 
 

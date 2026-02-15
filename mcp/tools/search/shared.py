@@ -183,8 +183,9 @@ def _search_from_semantic_index(
         return []
 
     raw_items = payload.get("items", []) if isinstance(payload, dict) else []
-    heap: list[tuple[float, dict]] = []
-    for item in raw_items:
+    # Keep a deterministic tie-breaker to avoid comparing dicts when similarity ties.
+    heap: list[tuple[float, int, dict]] = []
+    for idx, item in enumerate(raw_items):
         if not isinstance(item, dict):
             continue
         emb = item.get("embedding") or []
@@ -192,11 +193,11 @@ def _search_from_semantic_index(
         if sim < 0:
             continue
         if len(heap) < top_k:
-            heapq.heappush(heap, (sim, item))
+            heapq.heappush(heap, (sim, idx, item))
         elif sim > heap[0][0]:
-            heapq.heapreplace(heap, (sim, item))
+            heapq.heapreplace(heap, (sim, idx, item))
 
-    ranked = sorted(heap, key=lambda x: x[0], reverse=True)
+    ranked = sorted(heap, key=lambda x: (x[0], x[1]), reverse=True)
     return [
         {
             "doc": item.get("text", ""),
@@ -207,7 +208,7 @@ def _search_from_semantic_index(
             "distance": 1.0 - sim,
             "path": item.get("path", ""),
         }
-        for sim, item in ranked
+        for sim, _, item in ranked
     ]
 
 

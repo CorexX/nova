@@ -49,7 +49,7 @@ def check_vault_index(workspace_root: Path) -> CheckResult:
             status="error",
             message="Nicht indexiert",
             detail="file_hashes.json fehlt",
-            action="Fuehre `nova_index_vault` aus"
+            action="Fuehre `nova_system_maintain(operation='index')` aus"
         )
     
     try:
@@ -61,7 +61,7 @@ def check_vault_index(workspace_root: Path) -> CheckResult:
             status="error",
             message="Korrupt",
             detail=str(e),
-            action="Fuehre `nova_index_vault` mit force=true aus"
+            action="Fuehre `nova_system_maintain(operation='index', force=true)` aus"
         )
     
     # Pruefe ob ChromaDB Ordner existiert (ohne ChromaDB zu laden - das dauert 3-4s!)
@@ -78,7 +78,7 @@ def check_vault_index(workspace_root: Path) -> CheckResult:
             status="warning",
             message="Leer",
             detail="0 Dateien indexiert",
-            action="Fuehre `nova_index_vault` aus"
+            action="Fuehre `nova_system_maintain(operation='index')` aus"
         )
     
     return CheckResult(
@@ -118,7 +118,7 @@ def check_embedding_model(workspace_root: Path) -> CheckResult:
         status="warning",
         message="Nicht cached",
         detail="Wird beim ersten Aufruf heruntergeladen (~380 MB)",
-        action="Erster `nova_search_vault` Aufruf laedt das Modell"
+        action="Erster `nova_knowledge_query` Aufruf laedt das Modell"
     )
 
 

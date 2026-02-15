@@ -8,7 +8,7 @@ from pathlib import Path
 from mcp.types import TextContent, Tool
 
 from ..paths import resolve_paths
-from .shared import get_chromadb, get_model
+from .shared import tool_logger, semantic_search
 
 
 def get_tool_definition(workspace_root: Path) -> Tool:
@@ -40,74 +40,43 @@ def get_tool_definition(workspace_root: Path) -> Tool:
 
 async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     """Fuehrt semantische Suche ueber die Vault aus."""
-    import sys
-    import time
-    from mcp import server as mcp_server
-
-    try:
-        chromadb = get_chromadb()
-        start = time.time()
-        model = get_model()
-        elapsed = time.time() - start
-        if elapsed > 1.0:
-            print(f"[search_vault] Model loaded ({elapsed:.1f}s)", file=sys.stderr, flush=True)
-    except ImportError as e:
-        return [
-            TextContent(
-                type="text",
-                text=f"[ERROR] Dependencies fehlen: {e}\\n\\nInstalliere mit:\\npip install chromadb sentence-transformers",
-            )
-        ]
-
+    log = tool_logger("search_vault")
+    
     query = args["query"]
     top_k = args.get("top_k", 5)
     threshold = args.get("threshold", 0.3)
 
-    wait_for_model = getattr(mcp_server, "wait_for_model", None)
-    if callable(wait_for_model):
-        ready = await wait_for_model()
-        if not ready:
-            return [TextContent(type="text", text="Modell l\u00e4dt noch, bitte gleich erneut versuchen.")]
-
-    chroma_path = resolve_paths(workspace_root).chroma_path
-    if not chroma_path.exists():
+    cfg = resolve_paths(workspace_root)
+    chroma_path = cfg.chroma_path
+    semantic_index_file = cfg.index_root / "semantic_index.json"
+    if not semantic_index_file.exists() and not chroma_path.exists():
         return [
             TextContent(
                 type="text",
-                text="Index nicht gefunden.\\n\\nFuehre zuerst `nova_index_vault()` aus um die Vault zu indexieren.",
+                text="Index nicht gefunden.\\n\\nFuehre zuerst `nova_system_maintain(operation='index')` aus um die Vault zu indexieren.",
             )
         ]
 
-    client = chromadb.PersistentClient(path=str(chroma_path))
     try:
-        collection = client.get_collection("vault")
-    except Exception:
-        return [
-            TextContent(
-                type="text",
-                text="Collection 'vault' nicht gefunden.\\n\\nFuehre `nova_index_vault()` aus.",
-            )
-        ]
-
-    query_embedding = model.encode(query).tolist()
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=top_k,
-        include=["documents", "metadatas", "distances"],
-    )
+        items = semantic_search(str(chroma_path), query, top_k, log)
+    except ImportError as e:
+        return [TextContent(type="text", text=f"[ERROR] Dependencies fehlen: {e}\\n\\nInstalliere mit:\\npip install chromadb sentence-transformers")]
+    except RuntimeError as e:
+        return [TextContent(type="text", text=f"Semantische Suche derzeit deaktiviert: {e}")]
+    except Exception as e:
+        return [TextContent(type="text", text=f"Suche fehlgeschlagen ({type(e).__name__}). Fuehre `nova_system_maintain(operation='index')` aus.")]
 
     output_lines = [f"## Suche: \"{query}\"\\n"]
-    if not results["ids"][0]:
+    if not items:
         output_lines.append("Keine Ergebnisse gefunden.")
         return [TextContent(type="text", text="\\n".join(output_lines))]
 
     found = 0
     seen_paths = set()
-    for doc, meta, distance in zip(
-        results["documents"][0],
-        results["metadatas"][0],
-        results["distances"][0],
-    ):
+    for item in items:
+        doc = item["doc"]
+        meta = item["meta"]
+        distance = item["distance"]
         similarity = 1 - distance
         if similarity < threshold:
             continue
@@ -140,4 +109,5 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     else:
         output_lines.append(f"---\\n*{found} Treffer (Threshold: {threshold})*")
 
+    log("Done")
     return [TextContent(type="text", text="\\n".join(output_lines))]

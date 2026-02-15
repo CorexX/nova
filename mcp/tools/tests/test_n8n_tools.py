@@ -6,6 +6,7 @@ import pytest
 from mcp.types import TextContent, Tool
 
 from tools.n8n import (
+    api_request,
     client,
     create_workflow,
     delete_workflow,
@@ -24,6 +25,7 @@ class TestToolDefinitions:
             (create_workflow, "nova_n8n_create_workflow"),
             (update_workflow, "nova_n8n_update_workflow"),
             (delete_workflow, "nova_n8n_delete_workflow"),
+            (api_request, "nova_n8n_api_request"),
         ],
     )
     def test_definition_shape(self, module, name, tmp_path: Path):
@@ -307,3 +309,110 @@ class TestExecute:
     async def test_delete_requires_id(self, tmp_path: Path):
         result = await delete_workflow.execute({}, tmp_path)
         assert "workflow_id" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_api_request_requires_method(self, tmp_path: Path):
+        result = await api_request.execute({"path": "/api/v1/workflows"}, tmp_path)
+        assert "Invalid method" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_api_request_requires_path(self, tmp_path: Path):
+        result = await api_request.execute({"method": "GET"}, tmp_path)
+        assert "path" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_api_request_rejects_full_url_path(self, tmp_path: Path):
+        result = await api_request.execute(
+            {"method": "GET", "path": "https://n8n.home/api/v1/workflows"},
+            tmp_path,
+        )
+        assert "must be a path" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_api_request_rejects_payload_for_get(self, tmp_path: Path):
+        result = await api_request.execute(
+            {"method": "GET", "path": "/api/v1/workflows", "payload": {"x": 1}},
+            tmp_path,
+        )
+        assert "GET requests do not support 'payload'" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_api_request_executes_post(self, monkeypatch, tmp_path: Path):
+        monkeypatch.setattr(
+            api_request,
+            "resolve_n8n_config",
+            lambda args: ("https://n8n.home", "key", True),
+        )
+        called = {}
+
+        def fake_request_json(**kwargs):
+            called.update(kwargs)
+            return {"status": 200, "data": {"ok": True}}
+
+        monkeypatch.setattr(api_request, "request_json", fake_request_json)
+        result = await api_request.execute(
+            {"method": "POST", "path": "api/v1/workflows", "payload": {"name": "x"}},
+            tmp_path,
+        )
+        assert called["method"] == "POST"
+        assert called["path"] == "/api/v1/workflows"
+        assert called["payload"] == {"name": "x"}
+        assert called["insecure_tls"] is True
+        assert '"status": 200' in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_api_request_compacts_get_workflows_by_default(self, monkeypatch, tmp_path: Path):
+        monkeypatch.setattr(
+            api_request,
+            "resolve_n8n_config",
+            lambda args: ("https://n8n.home", "key", False),
+        )
+
+        monkeypatch.setattr(
+            api_request,
+            "request_json",
+            lambda **kwargs: {
+                "status": 200,
+                "data": {
+                    "data": [
+                        {
+                            "id": "wf1",
+                            "name": "flow",
+                            "active": True,
+                            "updatedAt": "2026-01-01T00:00:00.000Z",
+                            "nodes": [{"id": "A"}],
+                            "connections": {"A": {"main": []}},
+                        }
+                    ],
+                    "nextCursor": None,
+                },
+            },
+        )
+
+        result = await api_request.execute({"method": "GET", "path": "/api/v1/workflows"}, tmp_path)
+        assert '"id": "wf1"' in result[0].text
+        assert '"nodeCount": 1' in result[0].text
+        assert '"nodes"' not in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_api_request_compact_false_returns_raw(self, monkeypatch, tmp_path: Path):
+        monkeypatch.setattr(
+            api_request,
+            "resolve_n8n_config",
+            lambda args: ("https://n8n.home", "key", False),
+        )
+
+        monkeypatch.setattr(
+            api_request,
+            "request_json",
+            lambda **kwargs: {
+                "status": 200,
+                "data": {"id": "wf1", "nodes": [{"id": "A"}]},
+            },
+        )
+
+        result = await api_request.execute(
+            {"method": "GET", "path": "/api/v1/workflows/wf1", "compact": False},
+            tmp_path,
+        )
+        assert '"nodes"' in result[0].text

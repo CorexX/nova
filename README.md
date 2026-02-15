@@ -14,10 +14,54 @@
 
 </div>
 
+## Projektvision
+
+Moderne Agenten sind stark, aber zustandslos. Kontext geht verloren, Entscheidungen bleiben fluechtig.
+NOVA baut deshalb ein persistentes, kontrolliertes Arbeitsgedaechtnis fuer reale Agentenarbeit.
+
+**NOVA ist kein Chat-Interface. NOVA ist eine Arbeitsumgebung fuer Agenten.**
+
+### Ein-Satz-Vision
+
+NOVA ist ein persistentes, agentenfaehiges Kontext- und Arbeitssystem, das selektive Kontextbereitstellung mit strukturierter Wissensverankerung verbindet.
+
+### Arbeitszyklus (Kern von NOVA)
+
+```
+Init -> Intent -> Context -> Action -> Persist -> Review
+```
+
+| Schritt | Ziel |
+|---------|------|
+| `Init` | Session und Basis-Kontext starten |
+| `Intent` | Nutzerabsicht einordnen (z. B. weiterarbeiten, neues Projekt, Frage, Workflow-Run) |
+| `Context` | Relevante Informationen selektiv laden |
+| `Action` | Agent arbeitet aktiv an Dateien, Code, Runbooks, Repos |
+| `Persist` | Erkenntnisse strukturiert zurueck in die Wissensbasis schreiben |
+| `Review` | Ergebnis und naechste Schritte transparent machen |
+
+### Produktprinzipien
+
+| Prinzip | Aussage |
+|---------|---------|
+| Persistenz vor Antwort | Relevante Arbeit erzeugt Wissen im System |
+| Append statt Overwrite | Historie bleibt nachvollziehbar |
+| Struktur-agnostisch, semantisch auswertbar | Keine starre Dokumentpflicht, aber nutzbare Metadaten und Relationen |
+| Kontext vor Aktion | Kein Handeln ohne aufgeloesten Arbeitskontext |
+| Transparenz | Quelle, Auswahlgrund und Sicherheitsgrad werden sichtbar |
+
+### Was NOVA explizit nicht ist
+
+- Kein generischer Chatbot
+- Kein Kalender- oder Task-Assistent
+- Keine reine RAG-Engine
+- Keine starre Wissensplattform
+
 ## Was NOVA ist
 
 NOVA erweitert die Zusammenarbeit mit stateless Agenten (z. B. Copilot oder Codex) um eine fehlende Schicht:  
 **Kontext, der bleibt, waechst und wiederverwendbar ist.**
+Context-Orchestrierungs-Layer für Agenten.
 
 ```
   Ohne:   Session --> Recherche --> vergessen
@@ -88,18 +132,17 @@ Klare Trennung von Framework und Wissen:
 ## Betriebsprinzipien
 
 ```
-  Start --> session_init() --> Arbeiten --> Persistieren
-                                                  |
-                                        WORKLOG   |   Knowledge
-                                        (append)  |   (create)
+  Start --> Init --> Intent --> Kontext --> Aktion --> Persistenz --> Review
+                                                        |             |
+                                                        +--> Worklog  +--> Naechster Schritt
 ```
 
 | Prinzip | Regel |
 |---------|-------|
-| Session Start | Immer mit `nova_session_init()` beginnen |
+| Session Start | Immer mit `nova_context_resolve(query="session init")` beginnen |
 | Persistieren | Ergebnisse in Vault speichern, nicht nur im Chat |
 | Append | Bestehende Notes erweitern, nicht ueberschreiben |
-| Lazy Load | Kontext gezielt laden, nicht blind komplett |
+| Kontextoekonomie | Kontext gezielt laden, budgetieren, deduplizieren, priorisieren |
 | Modular | Core lauffaehig ohne optionale Integrationen |
 
 <details>
@@ -124,7 +167,7 @@ python setup.py
 # 3) VS Code neu laden
 
 # 4) Neue Session starten
-nova_session_init
+nova_context_resolve
 ```
 
 **Express Setup:** `python setup.py --quick` (nutzt Defaults)

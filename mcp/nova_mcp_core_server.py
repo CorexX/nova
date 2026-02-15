@@ -34,7 +34,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
 # Tool Imports
-from tools.v2 import (
+from tools import (
     context_resolve,
     project_continue,
     project_create,

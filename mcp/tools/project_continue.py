@@ -8,7 +8,7 @@ from pathlib import Path
 
 from mcp.types import TextContent, Tool
 
-from ..paths import resolve_paths
+from .paths import resolve_paths
 from .common import json_text, rel_or_abs
 
 

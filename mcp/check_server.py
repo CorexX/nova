@@ -73,7 +73,7 @@ print()
 if all_ok:
     print("Testing embedding model loading...")
     try:
-        from tools.search.shared import get_model
+        from tools.search_shared import get_model
         import time
         start = time.time()
         model = get_model()

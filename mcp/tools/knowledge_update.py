@@ -49,8 +49,10 @@ def _target_knowledge_dir(knowledge_root: Path, project: str) -> Path:
         nested_knowledge = c / "knowledge"
         if nested_knowledge.exists() and nested_knowledge.is_dir():
             return nested_knowledge
-        # Auch ohne Subfolder direkt in Projektordner schreiben.
-        return c
+
+    # Fallback: best passender Projektordner ohne knowledge-Unterordner.
+    if candidates:
+        return candidates[0]
 
     # Fallback ohne Strukturannahme.
     return knowledge_root / "knowledge"

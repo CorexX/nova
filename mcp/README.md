@@ -191,11 +191,48 @@ Output (Kernfelder):
 
 Funktionsweise:
 
-- Liest Konfiguration ueber `tools/paths.py`.
-- Ermittelt `top_k` dynamisch aus `token_budget`.
-- Fuehrt semantische Suche ueber `tools/search_shared.py` aus.
-- Dedupliziert Treffer auf Dateipfad-Ebene und berechnet Scores aus Distanzwerten.
-- Optionaler `project_hint` erhoeht Score bei Pfad-Match.
+- Validiert `query`; bei leerem Wert kommt `{"status":"error","message":"query is required"}`.
+- Setzt `token_budget` auf mindestens `300` und berechnet `top_k = max(3, min(12, token_budget // 180))`.
+- Bricht mit Fehler ab, wenn `search_enabled=false`.
+- Ruft `semantic_search(chroma_path, query, top_k * 2)` auf und dedupliziert Treffer pro Pfad.
+- Filtert optional per `scope` (Substring-Match auf kleingeschriebenem Pfad).
+- Score-Berechnung: `score = max(0.0, 1.0 - distance)`, gerundet auf 4 Stellen.
+- Optionaler `project_hint` gibt pro Treffer mit Pfad-Match `+0.05` (gedeckelt auf `0.999`) und sortiert neu.
+- Confidence: Mittelwert aller Scores, gedeckelt auf `0.99`, bei leerer Trefferliste `0.0`.
+
+Beispiel Request:
+
+```json
+{
+  "query": "session init",
+  "project_hint": "nova",
+  "token_budget": 1200,
+  "scope": ["projects", "internal"]
+}
+```
+
+Beispiel Response:
+
+```json
+{
+  "query": "session init",
+  "selection_reason": "semantic_search",
+  "confidence": 0.61,
+  "context_items": [
+    {
+      "path": "nova-knowledge/projects/internal/nova/CURRENT.md",
+      "snippet": "# CURRENT - NOVA ...",
+      "why_selected": "semantic_match+project_hint_boost"
+    }
+  ],
+  "sources": [
+    {
+      "path": "nova-knowledge/projects/internal/nova/CURRENT.md",
+      "score": 0.64
+    }
+  ]
+}
+```
 
 ### 2) `nova_knowledge_query`
 
@@ -215,9 +252,43 @@ Output:
 
 Funktionsweise:
 
-- Nutzt dieselbe semantische Retrieval-Pipeline wie `nova_context_resolve`.
-- Holt mehr Kandidaten (`limit * 3`) und filtert dann nach `project`/`topic` (Substring auf Pfad).
-- Dedupliziert pro Pfad und begrenzt auf `limit`.
+- Validiert `query`; bei leerem Wert kommt `{"status":"error","message":"query is required"}`.
+- Normalisiert `project` und `topic` auf lowercase und begrenzt `limit` auf `1..20`.
+- Bricht mit Fehler ab, wenn `search_enabled=false`.
+- Ruft `semantic_search(chroma_path, query, limit * 3)` auf.
+- Filtert danach pro Treffer per Pfad-Substring (`project`, `topic`) und dedupliziert pro Pfad.
+- Score-Berechnung: `score = max(0.0, 1.0 - distance)`, gerundet auf 4 Stellen.
+- Liefert maximal `limit` Treffer mit `why_relevant = "semantic_similarity"`.
+
+Beispiel Request:
+
+```json
+{
+  "query": "chroma index update",
+  "project": "nova",
+  "topic": "mcp",
+  "limit": 3
+}
+```
+
+Beispiel Response:
+
+```json
+{
+  "status": "ok",
+  "query": "chroma index update",
+  "project": "nova",
+  "topic": "mcp",
+  "matches": [
+    {
+      "path": "nova-knowledge/projects/internal/nova/knowledge/2026-02-15-index.md",
+      "snippet": "## Index Update ...",
+      "score": 0.72,
+      "why_relevant": "semantic_similarity"
+    }
+  ]
+}
+```
 
 ### 3) `nova_knowledge_update`
 
@@ -240,9 +311,40 @@ Output:
 
 Funktionsweise:
 
-- Ermittelt Zielordner struktur-agnostisch (bevorzugt vorhandene `knowledge`-Orte).
-- Schreibt pro Eintrag eine neue Markdown-Datei mit Frontmatter (`source`, `project`, `topic`, `confidence`, `date`).
-- Dateiname basiert auf Zeitstempel + Topic-Slug.
+- Pflichtfelder sind `content` und `source` (durch Tool-Schema erzwungen).
+- Zielordnerlogik:
+- Ohne `project`: bevorzugt existierendes `knowledge/` oder `resources/knowledge/`, sonst `knowledge_root/knowledge`.
+- Mit `project`: sucht Verzeichnisse via `rglob("*")` und `slugify(project)`-Substring im Ordnernamen; sortiert nach kuerzerem Pfad, waehlt zuerst den ersten Treffer mit vorhandenem Unterverzeichnis `knowledge/`, sonst den ersten Kandidatenordner selbst.
+- `confidence` wird auf `0.0..1.0` geklemmt; ungueltige Werte werden zu `None` (`n/a` im Frontmatter).
+- Schreibt immer eine neue Datei `<timestamp>-<topic_slug>.md` mit Frontmatter und optional `## Next Action`.
+
+Beispiel Request:
+
+```json
+{
+  "content": "Index Laufzeit sinkt nach Chunk-Reuse.",
+  "source": "benchmark 2026-02-15",
+  "project": "nova",
+  "topic": "search",
+  "confidence": 0.84,
+  "next_action": "Chunk-Size gegenchecken"
+}
+```
+
+Beispiel Response:
+
+```json
+{
+  "status": "ok",
+  "written_paths": [
+    "nova-knowledge/projects/internal/nova/knowledge/20260215-214500-search.md"
+  ],
+  "entry_ids": [
+    "20260215-214500-search"
+  ],
+  "link_updates": []
+}
+```
 
 ### 4) `nova_project_continue`
 
@@ -263,10 +365,50 @@ Output:
 
 Funktionsweise:
 
-- Sucht Projektordner struktur-agnostisch in `knowledge_root`.
-- Match-Logik: exakter Name > Teilstring > unscharfer Match.
-- Extrahiert erledigte/offene Aufgaben aus Markdown (Checkboxen, nummerierte Listen).
-- Baut daraus Statusbild und optional 3-Schritt-Plan.
+- Sucht Projektkandidaten rekursiv in `knowledge_root`.
+- Kandidat ist ein Ordner mit mindestens einem Signal:
+- Datei `CURRENT.md` oder `BACKLOG.md` oder `README.md`, oder mindestens 2 Markdown-Dateien.
+- Matching-Scoring fuer `project_hint`:
+- Exakter Name (`slug-normalisiert`) = 300
+- Teilstring im Ordnernamen = 220
+- Teilstring im relativen Pfad = 180
+- Fallback: `difflib.get_close_matches(..., cutoff=0.55)`.
+- Extrahiert aus bis zu 6 priorisierten Dokumenten (`CURRENT`, `BACKLOG`, `README`, dann alphabetisch):
+- `last_steps` aus `- [x] ...`
+- `open_items` aus `- [ ] ...`, sonst Fallback auf einfache `- ...` Bullets
+- `next_plan` aus nummerierten Listen (`1. ...`) plus offenen Punkten, max 3 Eintraege.
+- Bei `mode="status"` wird `next_plan` leer zurueckgegeben.
+
+Beispiel Request:
+
+```json
+{
+  "project_hint": "nova",
+  "mode": "continue"
+}
+```
+
+Beispiel Response:
+
+```json
+{
+  "project_hint": "nova",
+  "status": "ok",
+  "mode": "continue",
+  "project_path": "nova-knowledge/projects/internal/nova",
+  "last_steps": [
+    "MCP Tool Surface bereinigt"
+  ],
+  "open_items": [
+    "README mit API-Beispielen erweitern"
+  ],
+  "next_plan": [
+    "Doku finalisieren",
+    "Tooltest ausfuehren",
+    "CURRENT aktualisieren"
+  ]
+}
+```
 
 ### 5) `nova_project_create`
 
@@ -290,9 +432,48 @@ Output:
 
 Funktionsweise:
 
-- Ermittelt Basisordner heuristisch (`projects`, `kunden`, `workspaces`, `areas`) oder nutzt `target_root`.
-- Legt Projektstruktur inkl. `knowledge/` an.
-- Bootstrappt `README.md`, `CURRENT.md`, `BACKLOG.md`, falls noch nicht vorhanden.
+- Basisordner:
+- Mit `target_root`: `knowledge_root / target_root`
+- Sonst Heuristik in Reihenfolge: `projects`, `kunden`, `workspaces`, `areas`, sonst Default `knowledge_root/projects`.
+- Zielpfad: `<base>/<slug(customer)>/<slug(project_name)>`.
+- Wenn Projektordner schon existiert: Rueckgabe `status="exists"` ohne Ueberschreiben.
+- Legt `project_root` und `project_root/knowledge` an.
+- Schreibt `README.md`, `CURRENT.md`, `BACKLOG.md` nur, wenn Datei noch nicht existiert (`_write_if_missing`).
+
+Beispiel Request:
+
+```json
+{
+  "customer": "internal",
+  "project_name": "mcp cleanup",
+  "template": "default",
+  "initial_context": "Toolstruktur vereinfachen",
+  "target_root": "projects"
+}
+```
+
+Beispiel Response:
+
+```json
+{
+  "status": "ok",
+  "project_path": "nova-knowledge/projects/internal/mcp-cleanup",
+  "created_paths": [
+    "nova-knowledge/projects/internal/mcp-cleanup",
+    "nova-knowledge/projects/internal/mcp-cleanup/knowledge"
+  ],
+  "bootstrap_files": [
+    "nova-knowledge/projects/internal/mcp-cleanup/README.md",
+    "nova-knowledge/projects/internal/mcp-cleanup/CURRENT.md",
+    "nova-knowledge/projects/internal/mcp-cleanup/BACKLOG.md"
+  ],
+  "next_actions": [
+    "Projektziel in README.md schaerfen.",
+    "CURRENT.md mit konkreten Tasks aktualisieren.",
+    "Erste Erkenntnisse via nova_knowledge_update persistieren."
+  ]
+}
+```
 
 ### 6) `nova_system_maintain`
 
@@ -312,9 +493,65 @@ Output:
 
 Funktionsweise:
 
-- `health`: ruft `tools/health_checks.py` auf und liefert gruppierte Summary.
-- `index`: scannt Markdown-Dateien, chunked nach Headern, erzeugt Embeddings und schreibt `semantic_index.json` + `file_hashes.json`.
-- `restart`: startet verzögerten Self-Terminate-Timer (`delay_seconds` 1..30).
+- `health`: ruft `run_grouped_checks()` auf und formatiert die Ausgabe mit `format_grouped_simple()`.
+- `index`:
+- Initialisiert zuerst Embedding-Backend (`batch_encode_texts(["warmup"])`), optional `force_reload`.
+- Scannt `knowledge_root` rekursiv nach `*.md`.
+- Chunkt Inhalte per Header-Split (`#`/`##`) und begrenzt jeden Chunk auf 2000 Zeichen.
+- Nutzt inkrementelles Hashing via `file_hashes.json` (MD5 pro Datei), außer bei `force=true`.
+- Erzeugt/aktualisiert `semantic_index.json` mit Embeddings pro Chunk.
+- Entfernt geloeschte Dateien aus Hash- und Index-Struktur.
+- `restart`: startet `threading.Timer` und beendet den Prozess via `os._exit(0)` nach `delay_seconds` (geklemmt auf 1..30).
+- Unerlaubte Operationen liefern `{"status":"error","details":{"message":"Unsupported operation. Allowed: health, index, restart"}}`.
+
+Beispiel Request (`health`):
+
+```json
+{
+  "operation": "health"
+}
+```
+
+Beispiel Response (`health`):
+
+```json
+{
+  "status": "ok",
+  "operation": "health",
+  "details": {
+    "summary": "[OK] **CORE:** MCP Tools 6 Tools | Python 3.13 | Core Files 3 vorhanden"
+  },
+  "artifacts": []
+}
+```
+
+Beispiel Request (`index`):
+
+```json
+{
+  "operation": "index",
+  "force": false
+}
+```
+
+Beispiel Response (`index`):
+
+```json
+{
+  "status": "ok",
+  "operation": "index",
+  "details": {
+    "force": false,
+    "changed_files": 12,
+    "unchanged_files": 274,
+    "deleted_files": 1,
+    "total_files": 286,
+    "total_chunks": 1640,
+    "index_file": "E:/Dev/NOVA/.nova/index/semantic_index.json"
+  },
+  "artifacts": []
+}
+```
 
 Hinweis: `operation="test"` ist bewusst nicht Teil der API.
 

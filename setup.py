@@ -721,14 +721,14 @@ level = "INFO"
                 core_ref = "../nova-core/core/CORE.md"
             instructions.write_text("""# NOVA Agent Instructions
 
-Du bist NOVA - ein Notes-based Orchestrated Virtual Assistant.
+Du bist NOVA - ein persistentes, agentenfähiges Kontextsystem.
 
 ## SESSION-START (PFLICHT)
 
 Bei JEDER neuen Konversation SOFORT ausfuehren:
 
 ```
-nova_session_init()
+nova_context_resolve(query="session init")
 ```
 
 Keine anderen Tools vorher. Keine Fragen. Einfach ausfuehren.
@@ -750,7 +750,7 @@ Details in: [CORE.md]({core_ref})
 
 ## Session Start
 
-- On every new session, run `nova_session_init()` as the very first action before any response to the user.
+- On every new session, run `nova_context_resolve(query="session init")` as the very first action before any response to the user.
 - On every new session, read the current version of core.md. That is you. `{core_path_hint}`
 - If the tool call fails, report the failure briefly and continue with the best available local context.
 """.replace("{core_path_hint}", core_path_hint), encoding="utf-8")
@@ -855,14 +855,14 @@ def show_next_steps(config: SetupConfig, quality_gate_ran: bool) -> None:
     if config.client == "copilot":
         p("  2. Copilot Chat (Ctrl+Shift+I)")
         p("  3. Agent mode")
-        p("  4. In neuer Session sofort als ersten Tool-Call: nova_session_init")
+        p("  4. In neuer Session sofort als ersten Tool-Call: nova_context_resolve")
     elif config.client == "codex":
         p("  2. Ensure AGENTS.md is loaded by Codex in workspace root")
         p("  3. Start Codex session in this workspace")
-        p("  4. In neuer Session sofort als ersten Tool-Call: nova_session_init")
+        p("  4. In neuer Session sofort als ersten Tool-Call: nova_context_resolve")
     else:
-        p("  2. Copilot path: Copilot Chat (Ctrl+Shift+I) -> Agent mode -> nova_session_init")
-        p("  3. Codex path: start Codex in workspace root -> nova_session_init")
+        p("  2. Copilot path: Copilot Chat (Ctrl+Shift+I) -> Agent mode -> nova_context_resolve")
+        p("  3. Codex path: start Codex in workspace root -> nova_context_resolve")
         p("  4. Verify both instruction files: .github/copilot-instructions.md + AGENTS.md")
 
     quality_gate_cmd = (

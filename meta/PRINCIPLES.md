@@ -40,7 +40,7 @@
 
 5. Context First
    âŒ Sofort loslegen ohne Kontext
-   âœ… Erst nova_session_init() aufrufen
+   âœ Erst nova_context_resolve(query="session init") aufrufen
 
 6. Respect Scope
    âŒ Nach nova-core/ schreiben

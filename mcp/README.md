@@ -87,6 +87,8 @@ nova-core/
         ├── sessions/       # Session-Tools
         │   ├── summarize_day.py
         │   └── summarize_week.py
+        ├── system/         # Prozess-/Runtime-Tools
+        │   └── 
         ├── testing/        # Test-Runner
         │   └── run_tests.py
         └── worklog/        # Worklog-Tools
@@ -99,7 +101,12 @@ nova-core/
 
 | Tool | Kategorie | Beschreibung |
 |------|-----------|--------------|
-| `nova_session_init` | context | Lädt Session-Kontext (PFLICHT am Start) |
+| `nova_context_resolve` | v2 | Selektive Kontextauflösung (PFLICHT am Start) |
+| `nova_project_continue` | v2 | Projekt fortsetzen (3-Schritt-Plan) |
+| `nova_project_create` | v2 | Projekt strukturiert anlegen |
+| `nova_knowledge_query` | v2 | Semantische Wissensabfrage |
+| `nova_knowledge_update` | v2 | Erkenntnis persistieren (append-first) |
+| `nova_system_maintain` | v2 | System warten (health, index, test, restart) |
 | `nova_health_check` | health | Detaillierter System-Status Report |
 | `nova_git_push_repos` | git | Pushed alle Git-Repos im Workspace (derzeit defekt) |
 | `nova_worklog_append` | worklog | Fügt Eintrag zum WORKLOG.md hinzu |
@@ -114,8 +121,59 @@ nova-core/
 | `nova_n8n_create_workflow` | n8n | Erstellt einen Workflow via n8n API |
 | `nova_n8n_update_workflow` | n8n | Aktualisiert einen Workflow via n8n API |
 | `nova_n8n_delete_workflow` | n8n | Loescht einen Workflow via n8n API |
+| `nova_n8n_api_request` | n8n | Generischer API-Request (GET/POST/PUT/PATCH/DELETE) auf beliebige n8n Endpoints |
+| `nova_restart_server` | system | Plant einen MCP-Server-Restart (self-terminate mit Delay) |
 
 Hinweis: n8n ist optional. Ohne `N8N_BASE_URL` + `N8N_API_KEY` bleibt der Core funktionsfaehig; nur `nova_n8n_*` melden "optional feature not configured".
+
+### `nova_n8n_api_request` (Wildcard n8n API)
+
+Generischer Zugriff auf beliebige n8n API-Endpunkte mit `GET/POST/PUT/PATCH/DELETE`.
+
+Input-Parameter:
+- `method` (required): `GET | POST | PUT | PATCH | DELETE`
+- `path` (required): Endpoint-Pfad, z. B. `/api/v1/workflows`
+- `payload` (optional): JSON-Objekt fuer `POST/PUT/PATCH`
+- `base_url` (optional): n8n Base URL (fallback: `N8N_BASE_URL`)
+- `api_key` (optional): n8n API Key (fallback: `N8N_API_KEY`)
+- `insecure_tls` (optional): TLS-Verify deaktivieren
+- `compact` (optional, default `true`): reduziert GET-Ausgaben auf kontextrelevante Felder; mit `false` kommt die volle Raw-Antwort
+
+Wichtige Guardrails:
+- `path` muss ein Pfad sein, keine volle URL
+- `GET` mit `payload` wird abgelehnt
+- `payload` muss ein JSON-Objekt sein
+
+Beispiele:
+
+```json
+{
+  "method": "GET",
+  "path": "/api/v1/workflows?limit=10"
+}
+```
+
+```json
+{
+  "method": "POST",
+  "path": "/api/v1/workflows",
+  "payload": {
+    "name": "Demo Workflow",
+    "nodes": [],
+    "connections": {}
+  }
+}
+```
+
+```json
+{
+  "method": "PATCH",
+  "path": "/api/v1/workflows/<workflow_id>",
+  "payload": {
+    "name": "Renamed Workflow"
+  }
+}
+```
 
 ### Health Check
 
@@ -323,7 +381,6 @@ Alle MCP-Tools haben vollständige Tests. Stand: Februar 2026.
 | `test_context_get_templates.py` | `nova_get_templates` | 10 |
 | `test_context_get_guides.py` | `nova_get_guides` | 10 |
 | `test_context_get_playbooks.py` | `nova_get_playbooks` | 11 |
-| `test_context_session_init.py` | `nova_session_init` | 23 |
 | `test_health_check.py` | `nova_health_check` | 22 |
 | `test_search_search_vault.py` | `nova_search_vault` | 18 |
 | `test_search_index_vault.py` | `nova_index_vault` | 23 |
@@ -333,7 +390,7 @@ Alle MCP-Tools haben vollständige Tests. Stand: Februar 2026.
 | `test_testing_run_tests.py` | `nova_run_tests` | 17 |
 | `test_worklog_append.py` | `nova_worklog_append` | 9 |
 | `test_architecture_get_architecture.py` | `nova_get_architecture` | 10 |
-| `test_n8n_tools.py` | `nova_n8n_*` | 27 |
+| `test_n8n_tools.py` | `nova_n8n_*` | 33 |
 
 **Gesamt (2026-02-13): 304 passed, 5 skipped (`python -m pytest mcp/tools/tests -q`)**
 
@@ -407,7 +464,7 @@ python -c "from nova_mcp_core_server import TOOLS; print(list(TOOLS.keys()))"
 | `worklog/` | Worklog-Schreiben | append |
 | `testing/` | Tool-Testausfuehrung | run_tests |
 | `architecture/` | Architektur-Referenz | get_architecture |
-| `n8n/` | Optionale Workflow-API | list/get/create/update/delete_workflow |
+| `n8n/` | Optionale Workflow-API | list/get/create/update/delete + generic api_request |
 
 ---
 

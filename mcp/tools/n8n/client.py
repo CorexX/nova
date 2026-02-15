@@ -6,6 +6,7 @@ import json
 import os
 import ssl
 from typing import Any
+from pathlib import Path
 from urllib import parse, request
 from urllib.error import HTTPError, URLError
 
@@ -40,12 +41,65 @@ def normalize_base_url(base_url: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
 
+def _parse_dotenv(path: Path) -> dict[str, str]:
+    """Parse a minimal .env file format (KEY=VALUE)."""
+    values: dict[str, str] = {}
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except Exception:
+        return values
+
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip("'").strip('"')
+        if key:
+            values[key] = value
+    return values
+
+
+def _dotenv_fallback() -> dict[str, str]:
+    """Find .env files near CWD and NOVA workspace and return merged values."""
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return {}
+
+    candidates: list[Path] = []
+    cwd = Path.cwd()
+    candidates.append(cwd / ".env")
+    candidates.append(cwd.parent / ".env")
+
+    # .../mcp/tools/n8n/client.py -> workspace root is parents[3]
+    workspace_root = Path(__file__).resolve().parents[3]
+    candidates.append(workspace_root / ".env")
+
+    merged: dict[str, str] = {}
+    for path in candidates:
+        if path.exists():
+            merged.update(_parse_dotenv(path))
+    return merged
+
+
 def resolve_n8n_config(args: dict[str, Any]) -> tuple[str, str, bool]:
     """Resolve n8n base URL, API key and TLS mode from args/env."""
-    base_url = args.get("base_url") or os.environ.get("N8N_BASE_URL", "")
-    api_key = args.get("api_key") or os.environ.get("N8N_API_KEY", "")
+    dotenv = _dotenv_fallback()
+    base_url = (
+        args.get("base_url")
+        or os.environ.get("N8N_BASE_URL", "")
+        or dotenv.get("N8N_BASE_URL", "")
+    )
+    api_key = (
+        args.get("api_key")
+        or os.environ.get("N8N_API_KEY", "")
+        or dotenv.get("N8N_API_KEY", "")
+    )
     insecure_tls = _parse_bool(
-        args.get("insecure_tls", os.environ.get("N8N_INSECURE_TLS", False))
+        args.get(
+            "insecure_tls",
+            os.environ.get("N8N_INSECURE_TLS", dotenv.get("N8N_INSECURE_TLS", False)),
+        )
     )
 
     if not base_url and not api_key:

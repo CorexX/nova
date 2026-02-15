@@ -24,9 +24,11 @@ Wenn der Aufruf fehlschlaegt: Fehler kurz melden und mit bestmoeglichem lokalen 
 
 1. Lies und beachte sofort: Regeln, Scope, aktueller Fokus, aktive Tickets.
 2. Pruefe Schreibrechte vor jedem Write (insb. append-only bei `WORKLOG.md`).
-3. Wenn Pflichtkontext fehlt oder unklar ist: gezielt rueckfragen, nicht raten.
-4. Lade nur bei Bedarf nach (Lazy Loading), statt breite Vollabfragen zu machen.
-5. Nutze bevorzugt Tools fuer wiederholende Aufgaben statt manueller Chat-Prozesse.
+3. Wenn aus Nutzeranfrage oder aktivem Kontext ein Projekt klar erkennbar ist: direkt zweiten Resolve mit Hint fahren (`nova_context_resolve(query="status", project_hint="<projekt>")`).
+4. Nach den Pflicht-Resolves zuerst kurz und direkt auf die Nutzerfrage eingehen; Tool-/Kontext-Details nur wenn relevant oder angefragt.
+5. Wenn Pflichtkontext fehlt oder unklar ist: gezielt rueckfragen, nicht raten.
+6. Lade nur bei Bedarf nach (Lazy Loading), statt breite Vollabfragen zu machen.
+7. Nutze bevorzugt Tools fuer wiederholende Aufgaben statt manueller Chat-Prozesse.
 
 ## Kern-Tool-Mapping
 
@@ -74,6 +76,20 @@ Details: `PRINCIPLES.md`
 - Wissen abfragen: `nova_knowledge_query` statt breite Suche
 - System-Health: `nova_system_maintain(operation="health")`
 - Fuer Orientierung zuerst Kontext-Tools nutzen, dann tiefer lesen.
+
+## Unklarheits-Regel (Pflicht)
+
+Wenn eine Nutzeranfrage mehrdeutig ist oder eine Suche `matches: []` liefert:
+
+1. Fuehre direkt eine zweite Suche ohne enge Filter aus (ohne `project` und ohne `topic`).
+2. Wenn ein aktiver Projektkontext bekannt ist, zeige ihn kurz als Kontext-Hinweis, aber halte die zweite Suche global.
+3. Bleibt das Ergebnis leer oder mehrdeutig, stelle eine kurze Rueckfrage mit 2-3 konkreten Optionen.
+4. Triff keine stillen Annahmen zur Begriffsbedeutung.
+
+Minimales Ausgabeformat fuer Status-/Suchantworten:
+`| ctx:<projekt-oder-global> | hits:<anzahl> | next:<naechster-schritt> |`
+
+Hinweis: Die Labels sind nicht fix. Kurze, passende Feldnamen sind erlaubt (z. B. `scope`, `treffer`, `next`).
 
 ## Operativer Ausfuehrungsmodus
 

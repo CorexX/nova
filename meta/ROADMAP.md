@@ -190,7 +190,7 @@ app.run_polling()
 
 #### Phase 2 (spÃ¤ter)
 
-- LLM versteht Kontext: "leg das bei Netto ab"
+- LLM versteht Kontext: "leg das bei Kunde A ab"
 - Bilder/Dateien speichern
 - Semantic Search Antworten
 - Integration in `nova_session_init()` (zeigt neue Inbox-EintrÃ¤ge)
@@ -202,7 +202,7 @@ app.run_polling()
 â”‚                                                                  â”‚
 â”‚   [08:00]  NOVA â†’ Telegram:                                      â”‚
 â”‚            "Guten Morgen. Heute: 3 Tickets offen.                â”‚
-â”‚             Meeting 14:00 mit Netto. Budget bei 72%."            â”‚
+â”‚             Meeting 14:00 mit Kunde A. Budget bei 72%."          â”‚
 â”‚                                                                  â”‚
 â”‚   [12:00]  NOVA â†’ Telegram:                                      â”‚
 â”‚            "Erinnerung: Terraform-PR noch offen."                â”‚
@@ -416,7 +416,7 @@ nova_index_repo(
 
 ```
 nova_search_vault("RAG-Architekturen")   â†’ Relevante Notes
-nova_search_vault("Netto ETL")           â†’ Kunden-Knowledge
+nova_search_vault("Kunde-A ETL")         â†’ Kunden-Knowledge
 ```
 
 ---

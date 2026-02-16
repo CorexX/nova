@@ -34,7 +34,7 @@ Falls Meetings fehlen → nachtragen.
 ### 4. Tickets zuordnen
 
 Jeder Eintrag braucht eine Ticket-ID:
-- `ALDI-123` für Kundenprojekte
+- `KUNDE-123` für Kundenprojekte
 - `GENAI-45` für Kompetenzteam
 - `INTERN-0` für interne Arbeit
 

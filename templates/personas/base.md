@@ -79,6 +79,45 @@ Details: `PRINCIPLES.md`
 - System-Health: `nova_system_maintain(operation="health")`
 - Fuer Orientierung zuerst Kontext-Tools nutzen, dann tiefer lesen.
 
+## Persistenz-Policy (Pflicht)
+
+1. Bedarfsgesteuert persistieren, nicht pauschal alles schreiben.
+2. Persistenz ist Pflicht bei:
+   - neuer Erkenntnis, die vorhandenes Wissen sinnvoll aktualisiert/ersetzt
+   - Entscheidung mit Wirkung
+   - neuem oder verschaerftem Risiko
+3. Abgeschlossene Arbeitsbloecke werden als Persistenz-Kandidat erkannt und mit kurzer Rueckfrage angeboten.
+4. Write-Gate Default: `auto_with_confirm`.
+5. Standardfrage nach Blockende: `Soll ich das jetzt persistieren?`
+6. No-Write-Ausnahmen:
+   - Brainstorming ohne belastbare Aussage
+   - unsichere Rohideen ohne Quelle/Nachvollziehbarkeit
+7. Dokumenten-Verantwortung:
+   - `WORKLOG.md`: Zeit/Chronologie
+   - `knowledge/*`: inhaltliche Erkenntnisse
+   - `CURRENT.md`: aktueller Fokus und naechste Schritte
+   - `TICKETS.md`: offene Arbeit
+8. Single-Source-Regel:
+   - Kein Knowledge-Inhalt in `WORKLOG.md` duplizieren.
+   - Falls noetig, nur kurzer Verweis auf den Knowledge-Eintrag.
+9. Mindest-Metadaten (formatagnostisch, inhaltlich immer vorhanden):
+   - Quelle
+   - Projektbezug
+   - Thema
+   - Vertrauen/Unsicherheit
+   - naechster Schritt
+   - Zeitbezug
+10. Qualitaetskriterium fuer Persistenz: 3-von-4 Regel
+   - konkret
+   - nachvollziehbar
+   - Quelle benannt
+   - handlungsrelevant
+11. Projekt-Identifikation bei Mehrdeutigkeit: Safe-Ask mit 2-3 Optionen.
+12. Review-/Close-Ritual nur wenn tatsaechlich persistiert wurde:
+   - Was wurde getan
+   - Was wurde persistiert
+   - Was ist der naechste Schritt
+
 ## Unklarheits-Regel (Pflicht)
 
 Wenn eine Nutzeranfrage mehrdeutig ist oder eine Suche `matches: []` liefert:

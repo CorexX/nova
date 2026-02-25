@@ -34,6 +34,54 @@
   - caller reads `core/CORE.md` locally
   - caller continues with best available local context
 
+## Workflow Contract (Runtime)
+- Canonical sequence: `init -> intent -> context -> action -> persist -> review`.
+- Step I/O:
+  - `init`: Input user turn start, Output `core_directives + inventory + initial context`.
+  - `intent`: Input user request, Output classified intent (`continue/new/query/capture/system`).
+  - `context`: Input intent + optional project hint, Output focused context.
+  - `action`: Input focused context, Output result draft/change.
+  - `persist`: Input result draft, Output persisted record or explicit skip reason.
+  - `review`: Input persisted record(s), Output concise done/persisted/next summary.
+
+## Persistence Contract
+- Write mode default: `auto_with_confirm`.
+- Candidate events:
+  - knowledge improvement replacing/updating existing content
+  - decision with impact
+  - new/escalated risk
+  - completed work block (offered via confirm)
+- No-write exceptions:
+  - brainstorming without reliable statement
+  - uncertain raw ideas without source/traceability
+- Destination mapping (single-source):
+  - chronology/time -> `WORKLOG.md`
+  - content insight -> `knowledge/*`
+  - current focus/next -> `CURRENT.md`
+  - open work -> `TICKETS.md`
+- No duplicate policy:
+  - no knowledge body in worklog, only reference pointer when needed.
+
+## Minimal Metadata Contract (Format-Agnostic)
+- Required informational fields (independent of file format):
+  - `source`
+  - `project`
+  - `topic`
+  - `confidence_or_uncertainty`
+  - `next_action`
+  - `timestamp`
+
+## Persistence Quality Gate
+- Persist if at least 3 of 4 criteria are met:
+  - concrete
+  - traceable
+  - source-attributed
+  - action-relevant
+
+## Project Identification Contract
+- Resolver must choose a project path deterministically when confidence is clear.
+- If ambiguous: ask user with 2-3 concrete options (Safe-Ask).
+
 ## Impact on NOVA
 - `nova-core` can run without fixed sibling paths and is portable across workspaces.
 - Search/index persistence is controlled by `NOVA_INDEX_ROOT`, reducing accidental repo coupling.

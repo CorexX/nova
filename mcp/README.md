@@ -592,12 +592,26 @@ Diese Summary wird von `nova_system_maintain(operation="health")` ausgegeben.
 
 1. `nova_system_maintain(operation="health")`
 2. `nova_system_maintain(operation="index", force=false)`
-3. `nova_context_resolve(query="session init")`
+3. `nova_context_resolve(query="session init", include_inventory=true)`
 
 ### Nach grossen Content-Aenderungen
 
 1. `nova_system_maintain(operation="index", force=true)`
 2. `nova_knowledge_query(query="...")`
+
+## Policy zu Tool-Mapping
+
+- Start/Regeln/Inventar: `nova_context_resolve(query="session init", include_inventory=true)`
+- Projektstatus/Weiterarbeiten: `nova_project_continue(project_hint, mode)`
+- Persistenz von Erkenntnissen/Entscheidungen/Risiken: `nova_knowledge_update(...)`
+- Offene Fragen/Suche: `nova_knowledge_query(...)`
+- Betriebszustand: `nova_system_maintain(operation="health")`
+
+Empfohlener Persistenz-Flow (`auto_with_confirm`):
+1. Arbeitsblock abgeschlossen oder Erkenntnis erkannt.
+2. Kurze Rueckfrage: `Soll ich das jetzt persistieren?`
+3. Bei Zustimmung: `nova_knowledge_update(...)`.
+4. Danach kurze Review-Ausgabe (`done/persisted/next`), nur wenn geschrieben wurde.
 
 ## Fehlerbilder / Troubleshooting
 

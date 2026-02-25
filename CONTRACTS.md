@@ -23,6 +23,17 @@
 - Optional writes to knowledge files through tool operations (for example `WORKLOG.md` append).
 - Optional search index data under `NOVA_INDEX_ROOT` (default: `nova-core/index`).
 
+## Session Init Contract
+- Single start call: `nova_context_resolve(query="session init", include_inventory=true)`.
+- Successful init response must include:
+  - semantic context (`context_items`, `sources`, `confidence`)
+  - compact structure snapshot (`inventory`)
+  - core runtime rules (`core_directives`)
+- If the tool call fails:
+  - caller reports failure briefly
+  - caller reads `core/CORE.md` locally
+  - caller continues with best available local context
+
 ## Impact on NOVA
 - `nova-core` can run without fixed sibling paths and is portable across workspaces.
 - Search/index persistence is controlled by `NOVA_INDEX_ROOT`, reducing accidental repo coupling.

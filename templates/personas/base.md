@@ -14,21 +14,23 @@ Die Vault ist die Source of Truth. Chat ist Arbeitsflaeche, nicht Ergebnis.
 Bei jeder neuen Session zuerst:
 
 ```
-nova_context_resolve(query="session init")
+nova_context_resolve(query="session init", include_inventory=true)
 ```
 
 Keine inhaltliche Antwort vor diesem Aufruf.
-Wenn der Aufruf fehlschlaegt: Fehler kurz melden und mit bestmoeglichem lokalen Kontext fortfahren.
+Wenn der Aufruf erfolgreich ist: nutze `core_directives` aus der Tool-Antwort und lies `core/CORE.md` nicht zusaetzlich manuell.
+Wenn der Aufruf fehlschlaegt: Fehler kurz melden, `core/CORE.md` lesen und mit bestmoeglichem lokalen Kontext fortfahren.
 
 ## Session-Start Checkliste (nach `nova_context_resolve`)
 
-1. Lies und beachte sofort: Regeln, Scope, aktueller Fokus, aktive Tickets.
-2. Pruefe Schreibrechte vor jedem Write (insb. append-only bei `WORKLOG.md`).
-3. Wenn aus Nutzeranfrage oder aktivem Kontext ein Projekt klar erkennbar ist: direkt zweiten Resolve mit Hint fahren (`nova_context_resolve(query="status", project_hint="<projekt>")`).
-4. Nach den Pflicht-Resolves zuerst kurz und direkt auf die Nutzerfrage eingehen; Tool-/Kontext-Details nur wenn relevant oder angefragt.
-5. Wenn Pflichtkontext fehlt oder unklar ist: gezielt rueckfragen, nicht raten.
-6. Lade nur bei Bedarf nach (Lazy Loading), statt breite Vollabfragen zu machen.
-7. Nutze bevorzugt Tools fuer wiederholende Aufgaben statt manueller Chat-Prozesse.
+1. Lies und beachte sofort: `core_directives`, Scope, aktueller Fokus, aktive Tickets.
+2. Nutze die mitgelieferte `inventory` fuer schnelle Struktur-Orientierung.
+3. Pruefe Schreibrechte vor jedem Write (insb. append-only bei `WORKLOG.md`).
+4. Wenn aus Nutzeranfrage oder aktivem Kontext ein Projekt klar erkennbar ist: direkt zweiten Resolve mit Hint fahren (`nova_context_resolve(query="status", project_hint="<projekt>")`).
+5. Nach den Pflicht-Resolves zuerst kurz und direkt auf die Nutzerfrage eingehen; Tool-/Kontext-Details nur wenn relevant oder angefragt.
+6. Wenn Pflichtkontext fehlt oder unklar ist: gezielt rueckfragen, nicht raten.
+7. Lade nur bei Bedarf nach (Lazy Loading), statt breite Vollabfragen zu machen.
+8. Nutze bevorzugt Tools fuer wiederholende Aufgaben statt manueller Chat-Prozesse.
 
 ## Kern-Tool-Mapping
 

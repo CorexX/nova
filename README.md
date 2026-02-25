@@ -139,11 +139,13 @@ Klare Trennung von Framework und Wissen:
 
 | Prinzip | Regel |
 |---------|-------|
-| Session Start | Immer mit `nova_context_resolve(query="session init")` beginnen |
+| Session Start | Immer mit `nova_context_resolve(query="session init", include_inventory=true)` beginnen |
 | Persistieren | Ergebnisse in Vault speichern, nicht nur im Chat |
 | Append | Bestehende Notes erweitern, nicht ueberschreiben |
 | Kontextoekonomie | Kontext gezielt laden, budgetieren, deduplizieren, priorisieren |
 | Modular | Core lauffaehig ohne optionale Integrationen |
+
+Fallback bei Tool-Ausfall: Fehler kurz melden, `core/CORE.md` lokal lesen, mit lokalem Kontext fortfahren.
 
 <details>
 <summary>Mehr Details</summary>
@@ -233,6 +235,23 @@ N8N_INSECURE_TLS=false
 ```
 
 **Connection:** VS Code <-> stdio <-> launcher.py -> MCP Server -> 27 Tools
+
+## MCP in Codex
+
+Codex nutzt `~/.codex/config.toml` fuer externe MCP-Server.
+
+```toml
+[mcp_servers.nova-skills]
+command = "python"
+args = ["C:/REPO/NOVA/nova/launcher.py"]
+cwd = "C:/REPO/NOVA/nova"
+startup_timeout_sec = 60
+env = { NOVA_PREWARM_INDEX_BACKEND = "1", PYTHONIOENCODING = "utf-8" }
+```
+
+Hinweise:
+- `startup_timeout_sec = 60` verhindert Start-Timeouts bei langsamerem Warmstart.
+- `NOVA_PREWARM_INDEX_BACKEND = "1"` aktiviert Prewarm beim Serverstart, damit spaetere Tool-Calls schneller reagieren.
 
 ## Quality Gate
 

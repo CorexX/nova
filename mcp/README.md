@@ -181,6 +181,7 @@ Input:
 - `project_hint` (optional, string)
 - `token_budget` (optional, integer, default `1200`)
 - `scope` (optional, `string[]`)
+- `include_inventory` (optional, bool, default `false`)
 
 Output (Kernfelder):
 
@@ -188,6 +189,8 @@ Output (Kernfelder):
 - `confidence`
 - `context_items[]` mit `path`, `snippet`, `why_selected`
 - `sources[]`
+- optional `inventory` (bei `include_inventory=true`)
+- bei `query="session init"` zusaetzlich `core_directives`
 
 Funktionsweise:
 
@@ -199,6 +202,8 @@ Funktionsweise:
 - Score-Berechnung: `score = max(0.0, 1.0 - distance)`, gerundet auf 4 Stellen.
 - Optionaler `project_hint` gibt pro Treffer mit Pfad-Match `+0.05` (gedeckelt auf `0.999`) und sortiert neu.
 - Confidence: Mittelwert aller Scores, gedeckelt auf `0.99`, bei leerer Trefferliste `0.0`.
+- Bei `include_inventory=true`: kompakte struktur-agnostische Ordneruebersicht.
+- Bei `query="session init"`: `core_directives` aus `core/CORE.md` (`hard_rules`, `priorities`, `fallback_policy`).
 
 Beispiel Request:
 
@@ -207,7 +212,8 @@ Beispiel Request:
   "query": "session init",
   "project_hint": "nova",
   "token_budget": 1200,
-  "scope": ["projects", "internal"]
+  "scope": ["projects", "internal"],
+  "include_inventory": true
 }
 ```
 
@@ -218,6 +224,11 @@ Beispiel Response:
   "query": "session init",
   "selection_reason": "semantic_search",
   "confidence": 0.61,
+  "core_directives": {
+    "status": "ok",
+    "hard_rules": ["Context First", "Ask, Don't Assume"],
+    "priorities": ["Scope/Sicherheit", "Kernprinzipien"]
+  },
   "context_items": [
     {
       "path": "nova-knowledge/projects/internal/nova/CURRENT.md",

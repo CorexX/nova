@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 from mcp.types import TextContent, Tool
 
@@ -33,6 +34,11 @@ def get_tool_definition(workspace_root: Path) -> Tool:
                     "items": {"type": "string"},
                     "description": "Optionale Scope-Filter, z.B. ['projects','resources']",
                 },
+                "include_inventory": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Optional: liefert eine kompakte Ordneruebersicht (sinnvoll fuer session init).",
+                },
             },
             "required": ["query"],
         },
@@ -46,6 +52,129 @@ def _path_in_scope(path: str, scope: list[str]) -> bool:
     return any(s.lower() in path_l for s in scope)
 
 
+def _as_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _build_inventory(cfg, workspace_root: Path, scope: list[str]) -> dict:
+    knowledge_root = cfg.knowledge_root
+    if not knowledge_root.exists():
+        return {
+            "status": "unavailable",
+            "reason": "knowledge_root_missing",
+            "knowledge_root": rel_or_abs(knowledge_root, workspace_root),
+        }
+
+    all_top = sorted([d.name for d in knowledge_root.iterdir() if d.is_dir()])
+    top_level = all_top[:12]
+
+    ignore_names = {
+        "knowledge",
+        "docs",
+        "notes",
+        "assets",
+        "archive",
+        "research",
+        "prompts",
+        "__pycache__",
+    }
+    signals = ("CURRENT.md", "BACKLOG.md", "README.md")
+    project_paths: list[str] = []
+
+    candidates: list[Path] = []
+    for path in knowledge_root.rglob("*"):
+        if not path.is_dir():
+            continue
+        if path.name.lower() in ignore_names:
+            continue
+        if not any((path / filename).exists() for filename in signals):
+            continue
+        rel_path = path.relative_to(knowledge_root).as_posix()
+        if not _path_in_scope(rel_path, scope):
+            continue
+        candidates.append(path)
+
+    # Deduplicate nested project-like folders.
+    # Keep nested folders only when they are likely explicit sub-project containers.
+    for path in sorted(candidates, key=lambda p: len(p.parts)):
+        rel_l = path.relative_to(knowledge_root).as_posix().lower()
+        has_parent_candidate = any(parent in candidates for parent in path.parents)
+        if has_parent_candidate and "/projekte/" not in rel_l and "/projects/" not in rel_l:
+            continue
+        project_paths.append(path.relative_to(knowledge_root).as_posix())
+
+    project_paths = sorted(set(project_paths))
+    return {
+        "status": "ok",
+        "knowledge_root": rel_or_abs(knowledge_root, workspace_root),
+        "top_level_dirs": top_level,
+        "project_paths": project_paths[:20],
+        "counts": {
+            "top_level_dirs": len(all_top),
+            "project_paths": len(project_paths),
+        },
+    }
+
+
+def _extract_numbered_section(md_text: str, heading: str, max_items: int = 8) -> list[str]:
+    lines = md_text.splitlines()
+    section_lines: list[str] = []
+    in_section = False
+    heading_l = heading.lower()
+    for raw in lines:
+        line = raw.rstrip()
+        if line.startswith("## "):
+            title = line[3:].strip().lower()
+            if in_section and title != heading_l:
+                break
+            in_section = title == heading_l
+            continue
+        if in_section:
+            section_lines.append(line)
+
+    out: list[str] = []
+    for line in section_lines:
+        m = re.match(r"^\s*\d+\.\s+(.*)$", line)
+        if m:
+            out.append(m.group(1).strip())
+        if len(out) >= max_items:
+            break
+    return out
+
+
+def _core_directives(cfg, workspace_root: Path) -> dict:
+    core_md = cfg.core_md
+    if not core_md.exists():
+        return {
+            "status": "unavailable",
+            "reason": "core_missing",
+            "core_path": rel_or_abs(core_md, workspace_root),
+        }
+
+    try:
+        text = core_md.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return {
+            "status": "unavailable",
+            "reason": "core_read_failed",
+            "core_path": rel_or_abs(core_md, workspace_root),
+        }
+
+    hard_rules = _extract_numbered_section(text, "Nicht verhandelbare Regeln", max_items=8)
+    priorities = _extract_numbered_section(text, "Prioritaet bei Konflikten", max_items=4)
+    return {
+        "status": "ok",
+        "core_path": rel_or_abs(core_md, workspace_root),
+        "hard_rules": hard_rules,
+        "priorities": priorities,
+        "fallback_policy": "Wenn session init fehlschlaegt: core/CORE.md lokal lesen und mit bestmoeglichem lokalen Kontext fortfahren.",
+    }
+
+
 async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     log = tool_logger("context_resolve")
     cfg = resolve_paths(workspace_root)
@@ -53,6 +182,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     project_hint = str(args.get("project_hint", "")).strip()
     token_budget = max(300, int(args.get("token_budget", 1200)))
     scope = [str(s) for s in (args.get("scope") or [])]
+    include_inventory = _as_bool(args.get("include_inventory", False))
     if not query:
         return [TextContent(type="text", text=json_text({"status": "error", "message": "query is required"}))]
 
@@ -127,4 +257,8 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         "sources": sources,
         "workspace_root": rel_or_abs(workspace_root, workspace_root),
     }
+    if include_inventory:
+        payload["inventory"] = _build_inventory(cfg, workspace_root, scope)
+    if query.lower() == "session init":
+        payload["core_directives"] = _core_directives(cfg, workspace_root)
     return [TextContent(type="text", text=json_text(payload))]

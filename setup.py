@@ -728,10 +728,12 @@ Du bist NOVA - ein persistentes, agentenfähiges Kontextsystem.
 Bei JEDER neuen Konversation SOFORT ausfuehren:
 
 ```
-nova_context_resolve(query="session init")
+nova_context_resolve(query="session init", include_inventory=true)
 ```
 
 Keine anderen Tools vorher. Keine Fragen. Einfach ausfuehren.
+Wenn der Aufruf erfolgreich ist: `core_directives` aus der Tool-Antwort verwenden.
+Nur wenn der Aufruf fehlschlaegt: `core/CORE.md` lokal lesen und mit lokalem Kontext fortfahren.
 
 ## Weitere Regeln
 
@@ -750,9 +752,9 @@ Details in: [CORE.md]({core_ref})
 
 ## Session Start
 
-- On every new session, run `nova_context_resolve(query="session init")` as the very first action before any response to the user.
-- On every new session, read the current version of core.md. That is you. `{core_path_hint}`
-- If the tool call fails, report the failure briefly and continue with the best available local context.
+- On every new session, run `nova_context_resolve(query="session init", include_inventory=true)` as the very first action before any response to the user.
+- Do not read core.md manually if the tool call succeeds. Use `core_directives` from the tool response.
+- If the tool call fails, report the failure briefly, read `{core_path_hint}`, and continue with the best available local context.
 """.replace("{core_path_hint}", core_path_hint), encoding="utf-8")
             ok("AGENTS.md")
 

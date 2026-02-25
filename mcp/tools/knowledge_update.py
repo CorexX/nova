@@ -22,6 +22,7 @@ def get_tool_definition(workspace_root: Path) -> Tool:
                 "source": {"type": "string", "description": "Quelle der Erkenntnis"},
                 "project": {"type": "string", "description": "Optionales Projekt"},
                 "topic": {"type": "string", "description": "Optionales Thema"},
+                "title": {"type": "string", "description": "Optionaler Eintragstitel"},
                 "confidence": {"type": "number", "description": "Optional 0.0-1.0"},
                 "next_action": {"type": "string", "description": "Optionaler naechster Schritt"},
             },
@@ -65,6 +66,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     source = str(args.get("source", "")).strip()
     project = str(args.get("project", "")).strip()
     topic = str(args.get("topic", "")).strip() or "general"
+    title = str(args.get("title", "")).strip() or topic
     confidence_raw = args.get("confidence")
     next_action = str(args.get("next_action", "")).strip()
 
@@ -78,31 +80,44 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     now = datetime.now()
     day = now.strftime("%Y-%m-%d")
     stamp = now.strftime("%Y%m%d-%H%M%S")
+    time_of_day = now.strftime("%H:%M:%S")
     topic_slug = slugify(topic)
 
     target_dir = _target_knowledge_dir(cfg.knowledge_root, project)
     target_dir.mkdir(parents=True, exist_ok=True)
-    note_path = target_dir / f"{stamp}-{topic_slug}.md"
+    note_path = target_dir / f"{now.strftime('%Y%m%d')}-{topic_slug}.md"
 
     confidence_text = f"{confidence:.2f}" if confidence is not None else "n/a"
-    body = [
-        "---",
-        f"source: {source}",
-        f"project: {project or 'global'}",
-        f"topic: {topic}",
-        f"confidence: {confidence_text}",
-        f"date: {day}",
-        "---",
+    entry_block = [
+        f"## {time_of_day} - {title}",
         "",
-        f"# Knowledge Update - {topic}",
+        f"- project: {project or 'global'}",
+        f"- source: {source}",
+        f"- confidence: {confidence_text}",
         "",
-        "## Insight",
+        "### Insight",
         content,
     ]
     if next_action:
-        body.extend(["", "## Next Action", next_action])
+        entry_block.extend(["", "### Next Action", next_action])
 
-    note_path.write_text("\n".join(body).rstrip() + "\n", encoding="utf-8")
+    if note_path.exists():
+        existing = note_path.read_text(encoding="utf-8").rstrip()
+        updated = existing + "\n\n---\n\n" + "\n".join(entry_block).rstrip() + "\n"
+        note_path.write_text(updated, encoding="utf-8")
+    else:
+        body = [
+            "---",
+            f"project: {project or 'global'}",
+            f"topic: {topic}",
+            f"date: {day}",
+            "---",
+            "",
+            f"# Knowledge Update - {topic}",
+            "",
+            "\n".join(entry_block),
+        ]
+        note_path.write_text("\n".join(body).rstrip() + "\n", encoding="utf-8")
 
     entry_id = f"{stamp}-{topic_slug}"
     payload = {

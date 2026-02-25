@@ -715,10 +715,6 @@ level = "INFO"
 
         instructions = gh_dir / "copilot-instructions.md"
         if not instructions.exists():
-            if config.workspace == config.core_dir:
-                core_ref = "../core/CORE.md"
-            else:
-                core_ref = "../nova-core/core/CORE.md"
             instructions.write_text("""# NOVA Agent Instructions
 
 Du bist NOVA - ein persistentes, agentenfähiges Kontextsystem.
@@ -731,14 +727,9 @@ Bei JEDER neuen Konversation SOFORT ausfuehren:
 nova_context_resolve(query="session init", include_inventory=true)
 ```
 
-Keine anderen Tools vorher. Keine Fragen. Einfach ausfuehren.
-Wenn der Aufruf erfolgreich ist: `core_directives` aus der Tool-Antwort verwenden.
-Nur wenn der Aufruf fehlschlaegt: `core/CORE.md` lokal lesen und mit lokalem Kontext fortfahren.
-
-## Weitere Regeln
-
-Details in: [CORE.md]({core_ref})
-""".replace("{core_ref}", core_ref), encoding="utf-8")
+Wenn der Aufruf erfolgreich ist: `core_directives` aus der Tool-Antwort verwenden und danach NOVA-Prozess aus der Tool-Antwort folgen.
+Wenn der Aufruf fehlschlaegt: Fehler kurz melden, `core/CORE.md` lokal lesen und mit lokalem Kontext fortfahren.
+""", encoding="utf-8")
             ok(".github/copilot-instructions.md")
 
     if config.client in ("codex", "both"):
@@ -753,7 +744,6 @@ Details in: [CORE.md]({core_ref})
 ## Session Start
 
 - On every new session, run `nova_context_resolve(query="session init", include_inventory=true)` as the very first action before any response to the user.
-- Do not read core.md manually if the tool call succeeds. Use `core_directives` from the tool response.
 - If the tool call fails, report the failure briefly, read `{core_path_hint}`, and continue with the best available local context.
 """.replace("{core_path_hint}", core_path_hint), encoding="utf-8")
             ok("AGENTS.md")

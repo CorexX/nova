@@ -169,7 +169,7 @@ python setup.py
 # 3) VS Code neu laden
 
 # 4) Neue Session starten
-nova_context_resolve
+nova_context_resolve(query="session init", include_inventory=true)
 ```
 
 **Express Setup:** `python setup.py --quick` (nutzt Defaults)
@@ -227,14 +227,14 @@ N8N_INSECURE_TLS=false
     "nova-skills": {
       "type": "stdio",
       "command": "python",
-      "args": ["${workspaceFolder}/nova-core/launcher.py"],
+      "args": ["${workspaceFolder}/launcher.py"],
       "cwd": "${workspaceFolder}"
     }
   }
 }
 ```
 
-**Connection:** VS Code <-> stdio <-> launcher.py -> MCP Server -> 27 Tools
+**Connection:** VS Code <-> stdio <-> launcher.py -> MCP Server -> 6 Tools
 
 ## MCP in Codex
 

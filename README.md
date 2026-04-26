@@ -112,7 +112,7 @@ flowchart LR
     subgraph idx["Derived Indexes — disposable / rebuildable"]
         semantic["Semantic Search<br/>Sentence Transformers"]
         fts["SQLite FTS5<br/>exact terms + facets"]
-        graph["Graph-lite Retrieval<br/>concepts + lifecycle links"]
+        graphlite["Graph-lite Retrieval<br/>concepts + lifecycle links"]
     end
 
     operator -->|asks what matters| mcp --> tools
@@ -121,10 +121,10 @@ flowchart LR
     kb --> indexer
     indexer --> semantic
     indexer --> fts
-    indexer --> graph
+    indexer --> graphlite
     semantic -->|meaning signal| tools
     fts -->|exact/facet signal| tools
-    graph -->|relationship signal| tools
+    graphlite -->|relationship signal| tools
 ```
 
 ### Data Flow

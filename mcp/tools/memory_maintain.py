@@ -33,6 +33,8 @@ ALLOWED_MEMORY_TYPES = {
     "relationship",
 }
 
+ALLOWED_LIFECYCLE_STATUSES = {"active", "candidate", "superseded", "stale", "archived", "rejected"}
+
 REQUIRED_INDEX_FIELDS = {
     "id",
     "path",
@@ -247,6 +249,17 @@ async def _run_validate(workspace_root: Path) -> dict:
         memory_type = str(item.get("memory_type", ""))
         if memory_type and memory_type not in ALLOWED_MEMORY_TYPES:
             problems.append(_problem("invalid_memory_type", f"invalid memory_type: {memory_type}", memory_type=memory_type, id=item_id))
+        text = str(item.get("text", ""))
+        status_matches = re.findall(r"(?im)^\s*(?:[-*]\s*)?status\s*:\s*([a-z_-]+)\s*$", text)
+        for lifecycle_status in status_matches:
+            if lifecycle_status.lower() not in ALLOWED_LIFECYCLE_STATUSES:
+                problems.append(_problem(
+                    "invalid_lifecycle_status",
+                    f"invalid lifecycle status: {lifecycle_status}",
+                    status=lifecycle_status,
+                    id=item_id,
+                    path=path,
+                ))
         embedding = item.get("embedding")
         if not isinstance(embedding, list) or not embedding or not all(isinstance(value, (int, float)) for value in embedding):
             problems.append(_problem("invalid_embedding", "embedding must be a non-empty numeric list", id=item_id, item_index=idx))

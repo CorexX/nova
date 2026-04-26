@@ -29,6 +29,7 @@ ALLOWED_MEMORY_TYPES = {
 
 ALLOWED_SCOPES = {"global", "user", "project", "repo", "task", "session", "agent"}
 ALLOWED_MODES = {"append", "dry_run", "propose_patch"}
+ALLOWED_LIFECYCLE_STATUSES = {"active", "candidate", "superseded", "stale", "archived", "rejected"}
 
 
 def get_tool_definition(workspace_root: Path) -> Tool:
@@ -71,6 +72,12 @@ def get_tool_definition(workspace_root: Path) -> Tool:
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Optional: Memory-IDs, die durch diesen Eintrag ersetzt werden",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": sorted(ALLOWED_LIFECYCLE_STATUSES),
+                    "default": "active",
+                    "description": "Lifecycle-Status der Erinnerung",
                 },
             },
             "required": ["content", "source"],
@@ -147,6 +154,7 @@ def _make_entry_block(
     memory_type: str,
     scope: str,
     supersedes: list[str],
+    status: str,
 ) -> str:
     confidence_text = f"{confidence:.2f}" if confidence is not None else "n/a"
     supersedes_text = ", ".join(supersedes) if supersedes else "[]"
@@ -160,7 +168,7 @@ def _make_entry_block(
         f"- source: {source}",
         f"- memory_type: {memory_type}",
         f"- scope: {scope}",
-        "- status: active",
+        f"- status: {status}",
         f"- confidence: {confidence_text}",
         f"- supersedes: {supersedes_text}",
         "",
@@ -216,6 +224,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     memory_type = str(args.get("memory_type", "fact")).strip().lower() or "fact"
     scope = str(args.get("scope", "global")).strip().lower() or "global"
     mode = str(args.get("mode", "append")).strip().lower() or "append"
+    lifecycle_status = str(args.get("status", "active")).strip().lower() or "active"
     target_path_raw = str(args.get("target_path", "")).strip()
     supersedes = [str(item).strip() for item in (args.get("supersedes") or []) if str(item).strip()]
 
@@ -230,6 +239,8 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         validation_errors["scope"] = f"unsupported scope: {scope}"
     if mode not in ALLOWED_MODES:
         validation_errors["mode"] = f"unsupported mode: {mode}"
+    if lifecycle_status not in ALLOWED_LIFECYCLE_STATUSES:
+        validation_errors["status"] = f"unsupported status: {lifecycle_status}"
 
     confidence, confidence_error = _parse_confidence(confidence_raw)
     if confidence_error:
@@ -278,6 +289,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         memory_type=memory_type,
         scope=scope,
         supersedes=supersedes,
+        status=lifecycle_status,
     )
 
     entry = {
@@ -288,7 +300,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         "source": source,
         "memory_type": memory_type,
         "scope": scope,
-        "status": "active",
+        "status": lifecycle_status,
         "confidence": confidence,
         "supersedes": supersedes,
     }

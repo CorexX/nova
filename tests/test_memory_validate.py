@@ -141,6 +141,32 @@ class MemoryValidateTests(unittest.TestCase):
         self.assertIn("stale_file_hash", codes)
         self.assertIn("hash_for_missing_file", codes)
         self.assertIn("indexed_file_missing", codes)
+
+    def test_validate_reports_invalid_lifecycle_status_in_index_text(self):
+        note = self.knowledge / "note.md"
+        note.write_text("# Note\n\n- status: maybe\n", encoding="utf-8")
+        rel = note.relative_to(self.root).as_posix()
+        self._write_hashes({rel: hashlib.md5(note.read_text(encoding="utf-8").encode("utf-8")).hexdigest()})
+        self._write_index([
+            {
+                "id": f"{rel}#0",
+                "path": rel,
+                "section": "Note",
+                "line_start": 1,
+                "line_end": 3,
+                "memory_type": "fact",
+                "chunk_index": 0,
+                "text": "# Note\n\n- status: maybe",
+                "embedding": [0.1, 0.2],
+            }
+        ])
+
+        payload = self._validate()
+
+        codes = {problem["code"] for problem in payload["details"]["problems"]}
+        self.assertEqual(payload["status"], "warn")
+        self.assertIn("invalid_lifecycle_status", codes)
+
     def test_validate_warns_when_generated_index_artifacts_are_tracked_by_git(self):
         subprocess.run(["git", "init", "-b", "main"], cwd=self.root, check=True, stdout=subprocess.DEVNULL)
         subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=self.root, check=True)

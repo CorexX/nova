@@ -8,7 +8,7 @@ NOVA 2.0 exposes a minimal MCP interface for memory and context operations.
 |---|---|
 | `nova_context_resolve` | Select and return relevant context for a query |
 | `nova_knowledge_query` | Search the Markdown Knowledge Base |
-| `nova_knowledge_update` | Append durable knowledge updates |
+- `nova_knowledge_update` | Append durable knowledge updates with memory type, scope, lifecycle status, and optional supersedes metadata |
 | `nova_memory_maintain` | Run health, validation, and indexing |
 
 ## Start
@@ -73,6 +73,11 @@ Input:
 - `title` optional
 - `confidence` optional
 - `next_action` optional
+- `memory_type` optional: `fact`, `preference`, `decision`, `task`, `procedure`, `episode`, `source`, `summary`, `question`, `constraint`, `entity`, `relationship`
+- `scope` optional: `global`, `user`, `project`, `repo`, `task`, `session`, `agent`
+- `status` optional lifecycle state: `active`, `candidate`, `superseded`, `stale`, `archived`, `rejected`
+- `mode` optional: `append`, `dry_run`, `propose_patch`
+- `supersedes` optional list of replaced memory ids
 
 Output:
 

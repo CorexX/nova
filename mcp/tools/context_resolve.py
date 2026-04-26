@@ -146,6 +146,56 @@ def _extract_numbered_section(md_text: str, heading: str, max_items: int = 8) ->
     return out
 
 
+def _citation(path: str, meta: dict) -> dict:
+    return {
+        "path": path,
+        "section": meta.get("section") or "",
+        "line_start": meta.get("line_start"),
+        "line_end": meta.get("line_end"),
+    }
+
+
+def _pack_entry(item: dict) -> dict:
+    return {
+        "path": item["path"],
+        "section": item.get("section", ""),
+        "line_start": item.get("line_start"),
+        "line_end": item.get("line_end"),
+        "snippet": item.get("snippet", ""),
+        "score": item.get("score", 0.0),
+    }
+
+
+def _build_context_pack(query: str, project_hint: str, items: list[dict]) -> dict:
+    by_type: dict[str, list[dict]] = {}
+    for item in items:
+        by_type.setdefault(item.get("memory_type", "fact"), []).append(_pack_entry(item))
+
+    summary_source = items[0]["snippet"] if items else "No matching context found."
+    source_files = []
+    seen: set[str] = set()
+    for item in items:
+        if item["path"] not in seen:
+            source_files.append({"path": item["path"], "score": item["score"]})
+            seen.add(item["path"])
+
+    return {
+        "task": query,
+        "project": project_hint or None,
+        "summary": summary_source,
+        "relevant_decisions": by_type.get("decision", [])[:5],
+        "constraints": by_type.get("constraint", [])[:5],
+        "open_questions": by_type.get("question", [])[:5],
+        "tasks": by_type.get("task", [])[:5],
+        "facts": by_type.get("fact", [])[:5],
+        "source_files": source_files,
+        "suggested_next_actions": [
+            "Review the cited sources before making durable changes.",
+            "Persist any new decision or constraint with nova_knowledge_update.",
+        ],
+    }
+
+
 def _core_directives(cfg, workspace_root: Path) -> dict:
     principles_md = cfg.principles_md
     if not principles_md.exists():
@@ -217,6 +267,11 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
             "score": round(score, 4),
             "snippet": short_snippet(doc),
             "reason": "semantic_match",
+            "section": meta.get("section") or "",
+            "line_start": meta.get("line_start"),
+            "line_end": meta.get("line_end"),
+            "memory_type": meta.get("memory_type") or "fact",
+            "citation": _citation(path, meta),
         })
         if len(items) >= top_k:
             break
@@ -236,17 +291,22 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
             "path": i["path"],
             "snippet": i["snippet"],
             "why_selected": i["reason"],
+            "section": i.get("section", ""),
+            "memory_type": i.get("memory_type", "fact"),
+            "citation": i.get("citation") or _citation(i["path"], i),
         }
         for i in items
     ]
 
     payload = {
+        "status": "ok",
         "query": query,
         "project_hint": project_hint or None,
         "selection_reason": "semantic_search",
         "confidence": confidence,
         "token_budget": token_budget,
         "context_items": context_items,
+        "context_pack": _build_context_pack(query, project_hint, items),
         "sources": sources,
         "workspace_root": rel_or_abs(workspace_root, workspace_root),
     }

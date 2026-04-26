@@ -39,17 +39,59 @@ def get_tool_definition(workspace_root: Path) -> Tool:
     )
 
 
+def _classify_memory_type(section_name: str, text: str) -> str:
+    haystack = f"{section_name}\n{text}".lower()
+    if any(word in haystack for word in ("decision", "entscheidung", "adr")):
+        return "decision"
+    if any(word in haystack for word in ("constraint", "constraints", "einschränkung", "guardrail")):
+        return "constraint"
+    if any(word in haystack for word in ("open question", "open questions", "offene frage", "frage")):
+        return "question"
+    if any(word in haystack for word in ("todo", "task", "next action", "- [ ]")):
+        return "task"
+    if any(word in haystack for word in ("procedure", "workflow", "playbook", "how to")):
+        return "procedure"
+    if any(word in haystack for word in ("source", "reference", "quelle")):
+        return "source"
+    return "fact"
+
+
 def _split_by_headers(content: str) -> list[dict[str, Any]]:
+    lines = content.splitlines()
+    if not lines:
+        return []
+
+    header_indexes = [
+        idx for idx, line in enumerate(lines)
+        if re.match(r"^#{1,2}\s+.+", line)
+    ]
+    if not header_indexes and content.strip():
+        text = content.strip()[:2000]
+        return [{
+            "text": text,
+            "section": "",
+            "line_start": 1,
+            "line_end": len(lines),
+            "memory_type": _classify_memory_type("", text),
+        }]
+
     chunks: list[dict[str, Any]] = []
-    sections = re.split(r"\n(?=#{1,2}\s)", content)
-    for section in sections:
-        if not section.strip():
+    for pos, start_idx in enumerate(header_indexes):
+        end_idx = header_indexes[pos + 1] - 1 if pos + 1 < len(header_indexes) else len(lines) - 1
+        while end_idx > start_idx and not lines[end_idx].strip():
+            end_idx -= 1
+        raw_section = "\n".join(lines[start_idx:end_idx + 1]).strip()
+        if not raw_section:
             continue
-        header_match = re.match(r"^(#{1,2})\s+(.+)", section)
+        header_match = re.match(r"^(#{1,2})\s+(.+)", lines[start_idx])
         section_name = header_match.group(2).strip() if header_match else ""
-        chunks.append({"text": section.strip()[:2000], "section": section_name})
-    if not chunks and content.strip():
-        chunks.append({"text": content.strip()[:2000], "section": ""})
+        chunks.append({
+            "text": raw_section[:2000],
+            "section": section_name,
+            "line_start": start_idx + 1,
+            "line_end": end_idx + 1,
+            "memory_type": _classify_memory_type(section_name, raw_section),
+        })
     return chunks
 
 
@@ -156,6 +198,9 @@ async def _run_index(args: dict, workspace_root: Path) -> dict:
                 "id": f"{rel_path}#{idx}",
                 "path": rel_path,
                 "section": chunk.get("section", ""),
+                "line_start": chunk.get("line_start"),
+                "line_end": chunk.get("line_end"),
+                "memory_type": chunk.get("memory_type", "fact"),
                 "chunk_index": idx,
                 "text": chunk["text"],
                 "embedding": emb,

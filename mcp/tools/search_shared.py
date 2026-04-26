@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 from .index_store import full_text_search as _sqlite_full_text_search
+from .index_store import graph_search as _sqlite_graph_search
 
 _chromadb = None
 _model = None
@@ -229,6 +230,20 @@ def full_text_search(
     if log:
         log("Searching SQLite FTS index...")
     items = _sqlite_full_text_search(index_root, query, top_k)
+    if log:
+        log("Done")
+    return items
+
+
+def graph_search(
+    index_root: str,
+    query: str,
+    top_k: int = 5,
+    log: Callable[[str], None] | None = None,
+) -> list[dict]:
+    if log:
+        log("Searching SQLite graph index...")
+    items = _sqlite_graph_search(index_root, query, top_k)
     if log:
         log("Done")
     return items

@@ -7,29 +7,27 @@ __pycache__/
 venv/
 .venv/
 env/
-.env
+.pytest_cache/
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Obsidian
-.obsidian/workspace.json
-.obsidian/workspace-mobile.json
-
-# Secrets
+# Local environment / secrets
 .env
 *.pem
 *.key
 secrets/
 
-# NOVA Config (user-specific)
+# User-specific NOVA config
 nova.toml
 ../nova.toml
 
-# Build
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Build artifacts
 dist/
 build/
 *.egg-info/
@@ -38,19 +36,13 @@ build/
 *.log
 logs/
 
-# OS
-.DS_Store
-Thumbs.db
-
-# NOVA Index Artefakte
-index/chroma/
-index/file_hashes.json
-
-# NOVA (private)
+# NOVA generated indexes and local state
 .nova/
+.nova-index/
+index/
+**/chroma.sqlite3
+**/*.sqlite3
+
+# Private vaults / local workspaces
 nova-knowledge/
 nova.code-workspace
-/core/Core.md
-AGENTS.md
-index/
-.pytest_cache/

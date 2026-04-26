@@ -1,14 +1,8 @@
-# NOVA Core Requirements
-# MCP Server für GitHub Copilot Integration
+# NOVA 2.0 Memory Engine Requirements
 
 mcp>=1.0.0
 python-dotenv>=1.0.0
-anthropic>=0.79.0
 
-# Semantic Search
-chromadb>=0.4.0
+# Semantic search
 sentence-transformers>=2.2.0
-
-# Testing
-pytest>=8.0.0
-pytest-asyncio>=1.0.0
+chromadb>=0.4.0

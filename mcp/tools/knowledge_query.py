@@ -7,7 +7,7 @@ from pathlib import Path
 from mcp.types import TextContent, Tool
 
 from .paths import resolve_paths
-from .search_shared import tool_logger, semantic_search, full_text_search, hybrid_search, graph_search
+from .search_shared import tool_logger, semantic_search, full_text_search, hybrid_search, graph_search, facet_counts
 from .common import json_text, short_snippet
 
 
@@ -34,10 +34,35 @@ def get_tool_definition(workspace_root: Path) -> Tool:
                     "default": "section",
                     "description": "Deduplizierung: keine, pro Pfad oder pro Pfad+Section/Chunk",
                 },
+                "filters": {
+                    "type": "object",
+                    "description": "Optionale Facettenfilter für full_text-Suche, z.B. {'project':'nova','memory_type':['decision'],'tag':'mcp'}",
+                    "additionalProperties": {"type": ["string", "array"]},
+                },
+                "include_facets": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Liefert verfügbare Facetten-Zählungen für die aktuelle Anfrage zurück",
+                },
             },
             "required": ["query"],
         },
     )
+
+
+def _normalize_filters(filters: object) -> dict[str, list[str]]:
+    if not isinstance(filters, dict):
+        return {}
+    normalized: dict[str, list[str]] = {}
+    for key, value in filters.items():
+        facet_type = str(key).strip().lower()
+        if not facet_type:
+            continue
+        raw_values = value if isinstance(value, list) else [value]
+        clean = [str(item).strip().lower() for item in raw_values if str(item).strip()]
+        if clean:
+            normalized[facet_type] = sorted(set(clean))
+    return normalized
 
 
 async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
@@ -53,8 +78,19 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     dedupe = str(args.get("dedupe", "section")).strip().lower()
     if dedupe not in {"none", "path", "section"}:
         dedupe = "section"
+    filters = _normalize_filters(args.get("filters"))
+    include_facets = bool(args.get("include_facets", False))
     if not query:
         return [TextContent(type="text", text=json_text({"status": "error", "message": "query is required"}))]
+
+    if filters and mode != "full_text":
+        return [TextContent(type="text", text=json_text({
+            "status": "error",
+            "message": "Facet filters are currently supported only with mode=full_text.",
+            "query": query,
+            "mode": mode,
+            "filters": filters,
+        }))]
 
     if not cfg.search_enabled:
         payload = {
@@ -68,7 +104,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
 
     try:
         if mode == "full_text":
-            results = full_text_search(str(cfg.index_root), query, limit * 3, log)
+            results = full_text_search(str(cfg.index_root), query, limit * 3, log, filters=filters)
         elif mode == "graph":
             results = graph_search(str(cfg.index_root), query, limit * 3, log)
         elif mode == "hybrid":
@@ -121,6 +157,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
             "line_end": meta.get("line_end"),
             "memory_type": meta.get("memory_type") or "fact",
             "chunk_index": meta.get("chunk_index"),
+            "facets": meta.get("facets") or {},
             "snippet": short_snippet(doc),
             "score": round(score, 4),
             "why_relevant": item.get("why_relevant") or ("full_text_match" if mode == "full_text" else "semantic_similarity"),
@@ -144,6 +181,20 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         "project": project or None,
         "topic": topic or None,
         "dedupe": dedupe,
+        "filters": filters,
         "matches": matches,
     }
+    if include_facets:
+        try:
+            payload["available_facets"] = facet_counts(str(cfg.index_root), query, filters=filters)
+        except Exception as exc:
+            log(f"Error: {exc}")
+            return [TextContent(type="text", text=json_text({
+                "status": "error",
+                "message": f"Facettenberechnung fehlgeschlagen ({type(exc).__name__}): {exc}",
+                "query": query,
+                "project": project or None,
+                "topic": topic or None,
+                "filters": filters,
+            }))]
     return [TextContent(type="text", text=json_text(payload))]

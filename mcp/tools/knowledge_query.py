@@ -7,7 +7,7 @@ from pathlib import Path
 from mcp.types import TextContent, Tool
 
 from .paths import resolve_paths
-from .search_shared import tool_logger, semantic_search
+from .search_shared import tool_logger, semantic_search, full_text_search, hybrid_search
 from .common import json_text, short_snippet
 
 
@@ -22,6 +22,12 @@ def get_tool_definition(workspace_root: Path) -> Tool:
                 "project": {"type": "string", "description": "Optionaler Projektfilter (substring auf Pfad)"},
                 "topic": {"type": "string", "description": "Optionaler Topic-Filter (substring auf Pfad)"},
                 "limit": {"type": "integer", "default": 5, "description": "Maximale Trefferanzahl"},
+                "mode": {
+                    "type": "string",
+                    "enum": ["semantic", "full_text", "hybrid"],
+                    "default": "semantic",
+                    "description": "Suchmodus: semantisch, SQLite-FTS oder kombiniert",
+                },
                 "dedupe": {
                     "type": "string",
                     "enum": ["none", "path", "section"],
@@ -41,6 +47,9 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     project = str(args.get("project", "")).strip().lower()
     topic = str(args.get("topic", "")).strip().lower()
     limit = max(1, min(20, int(args.get("limit", 5))))
+    mode = str(args.get("mode", "semantic")).strip().lower()
+    if mode not in {"semantic", "full_text", "hybrid"}:
+        mode = "semantic"
     dedupe = str(args.get("dedupe", "section")).strip().lower()
     if dedupe not in {"none", "path", "section"}:
         dedupe = "section"
@@ -58,7 +67,12 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         return [TextContent(type="text", text=json_text(payload))]
 
     try:
-        results = semantic_search(str(cfg.chroma_path), query, limit * 3, log)
+        if mode == "full_text":
+            results = full_text_search(str(cfg.index_root), query, limit * 3, log)
+        elif mode == "hybrid":
+            results = hybrid_search(str(cfg.chroma_path), str(cfg.index_root), query, limit * 3, log)
+        else:
+            results = semantic_search(str(cfg.chroma_path), query, limit * 3, log)
     except Exception as exc:
         log(f"Error: {exc}")
         payload = {
@@ -95,7 +109,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         if dedupe_key:
             seen.add(dedupe_key)
         distance = float(item.get("distance", 1.0))
-        score = float(max(0.0, 1.0 - distance))
+        score = float(item.get("score", max(0.0, 1.0 - distance)))
         doc = str(item.get("doc") or item.get("text") or "")
         matches.append({
             "id": match_id,
@@ -107,7 +121,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
             "chunk_index": meta.get("chunk_index"),
             "snippet": short_snippet(doc),
             "score": round(score, 4),
-            "why_relevant": "semantic_similarity",
+            "why_relevant": item.get("why_relevant") or ("full_text_match" if mode == "full_text" else "semantic_similarity"),
             "citation": {
                 "path": path,
                 "section": meta.get("section") or "",
@@ -121,6 +135,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     payload = {
         "status": "ok",
         "query": query,
+        "mode": mode,
         "project": project or None,
         "topic": topic or None,
         "dedupe": dedupe,

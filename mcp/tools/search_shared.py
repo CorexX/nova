@@ -10,6 +10,8 @@ import threading
 from pathlib import Path
 from typing import Callable
 
+from .index_store import full_text_search as _sqlite_full_text_search
+
 _chromadb = None
 _model = None
 _model_lock = threading.Lock()
@@ -218,11 +220,62 @@ def _search_from_semantic_index(
     ]
 
 
+def full_text_search(
+    index_root: str,
+    query: str,
+    top_k: int = 5,
+    log: Callable[[str], None] | None = None,
+) -> list[dict]:
+    if log:
+        log("Searching SQLite FTS index...")
+    items = _sqlite_full_text_search(index_root, query, top_k)
+    if log:
+        log("Done")
+    return items
+
+
+def hybrid_search(
+    chroma_path: str,
+    index_root: str,
+    query: str,
+    top_k: int = 5,
+    log: Callable[[str], None] | None = None,
+) -> list[dict]:
+    semantic_items = semantic_search(chroma_path, query, top_k, log)
+    full_text_items = full_text_search(index_root, query, top_k, log)
+    by_id: dict[str, dict] = {}
+    for item in semantic_items:
+        meta = item.get("meta") or {}
+        item_id = str(item.get("id") or meta.get("id") or "")
+        key = item_id or f"{item.get('path', '')}:{item.get('doc', '')[:80]}"
+        merged = dict(item)
+        merged["why_relevant"] = item.get("why_relevant") or "semantic_similarity"
+        by_id[key] = merged
+    for item in full_text_items:
+        meta = item.get("meta") or {}
+        item_id = str(item.get("id") or meta.get("id") or "")
+        key = item_id or f"{item.get('path', '')}:{item.get('doc', '')[:80]}"
+        if key in by_id:
+            existing = by_id[key]
+            semantic_score = max(0.0, 1.0 - float(existing.get("distance", 1.0)))
+            text_score = float(item.get("score", 0.0))
+            existing["score"] = max(semantic_score, text_score)
+            existing["distance"] = min(float(existing.get("distance", 1.0)), float(item.get("distance", 1.0)))
+            existing["why_relevant"] = "hybrid_semantic_and_full_text"
+        else:
+            by_id[key] = item
+    return sorted(
+        by_id.values(),
+        key=lambda x: float(x.get("score", max(0.0, 1.0 - float(x.get("distance", 1.0))))),
+        reverse=True,
+    )[:top_k]
+
+
 def semantic_search(
     chroma_path: str,
     query: str,
     top_k: int = 5,
-    log: Callable[[str], None] | None = None
+    log: Callable[[str], None] | None = None,
 ) -> list[dict]:
     """
     Perform semantic search. Returns list of {path, doc, distance, meta}.

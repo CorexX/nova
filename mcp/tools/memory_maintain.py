@@ -14,6 +14,7 @@ from mcp.types import TextContent, Tool
 
 from .common import json_text
 from .paths import resolve_paths
+from .index_store import rebuild_sqlite_index
 from .search_shared import batch_encode_texts
 
 
@@ -393,6 +394,7 @@ async def _run_index(args: dict, workspace_root: Path) -> dict:
     }
     hash_file.write_text(json.dumps(existing_hashes, indent=2, ensure_ascii=False), encoding="utf-8")
     semantic_index_file.write_text(json.dumps(semantic_index, ensure_ascii=False), encoding="utf-8")
+    sqlite_index = rebuild_sqlite_index(index_path, all_items)
 
     return {
         "status": "ok",
@@ -406,6 +408,7 @@ async def _run_index(args: dict, workspace_root: Path) -> dict:
             "total_chunks": len(all_items),
             "scope": str(vault_path),
             "index_file": str(semantic_index_file),
+            "sqlite_index_file": sqlite_index["index_file"],
         },
         "artifacts": [],
     }

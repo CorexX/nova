@@ -1,99 +1,42 @@
 #!/usr/bin/env python3
-"""
-Quick Check: MCP Server Dependencies & Health
-Führe dieses Script aus um zu prüfen ob alles bereit ist.
+"""Quick health check for the NOVA memory engine."""
 
-Usage: python check_server.py
-"""
+from __future__ import annotations
 
+import importlib.util
 import sys
-import os
 from pathlib import Path
+
 from tools.paths import resolve_paths
 
+workspace = Path(__file__).resolve().parent.parent
+cfg = resolve_paths(workspace)
+
 print("=" * 60)
-print("NOVA MCP Server - Dependency Check")
+print("NOVA 2.0 Memory Engine - Check")
 print("=" * 60)
+print(f"Python: {sys.version.split()[0]}")
+print(f"Core root: {cfg.core_root}")
+print(f"Knowledge root: {cfg.knowledge_root}")
+print(f"Index root: {cfg.index_root}")
 print()
 
-# Python Info
-print(f"Python: {sys.version}")
-print(f"Executable: {sys.executable}")
-print()
+required = ["mcp"]
+optional = ["sentence_transformers", "chromadb"]
+ok = True
 
-# Check Dependencies
-deps = {
-    "mcp": "MCP Protocol (required)",
-    "chromadb": "Vector Database (for search)",
-    "sentence_transformers": "Embeddings (for search)",
-}
-
-all_ok = True
-for module, desc in deps.items():
-    try:
-        __import__(module)
-        print(f"✅ {module:<25} - {desc}")
-    except ImportError:
-        print(f"❌ {module:<25} - {desc} - MISSING!")
-        all_ok = False
+for module in required:
+    present = importlib.util.find_spec(module) is not None
+    ok = ok and present
+    print(f"{'OK' if present else 'MISSING'} required: {module}")
+for module in optional:
+    present = importlib.util.find_spec(module) is not None
+    print(f"{'OK' if present else 'MISSING'} optional: {module}")
 
 print()
-
-# Check Workspace
-workspace = Path(__file__).parent.parent.parent
-paths = resolve_paths(workspace)
-core_md = paths.core_md
-knowledge = paths.knowledge_root
-
-print(f"Workspace: {workspace}")
-print(f"  CORE.md exists: {'✅' if core_md.exists() else '❌'}")
-print(f"  nova-knowledge exists: {'✅' if knowledge.exists() else '❌'}")
-print()
-
-# Check Index
-index_path = paths.chroma_path
-hash_file = paths.index_root / "file_hashes.json"
-
-if index_path.exists():
-    print(f"✅ ChromaDB Index exists: {index_path}")
-else:
-    print(f"⚠️  ChromaDB Index not found (will be created on first use)")
-
-if hash_file.exists():
-    import json
-    try:
-        hashes = json.loads(hash_file.read_text())
-        print(f"   Indexed files: {len(hashes)}")
-    except:
-        pass
-
-print()
-
-# Test Model Loading
-if all_ok:
-    print("Testing embedding model loading...")
-    try:
-        from tools.search_shared import get_model
-        import time
-        start = time.time()
-        model = get_model()
-        elapsed = time.time() - start
-        print(f"✅ Model loaded in {elapsed:.1f}s")
-        
-        # Quick embedding test
-        test = model.encode("test query")
-        print(f"   Embedding dimension: {len(test)}")
-    except Exception as e:
-        print(f"❌ Model loading failed: {e}")
-        all_ok = False
-
-print()
+print(f"Knowledge root exists: {cfg.knowledge_root.exists()}")
+print(f"Markdown files: {sum(1 for _ in cfg.knowledge_root.rglob('*.md')) if cfg.knowledge_root.exists() else 0}")
+print(f"Semantic index exists: {(cfg.index_root / 'semantic_index.json').exists()}")
 print("=" * 60)
-if all_ok:
-    print("✅ ALL CHECKS PASSED - Server should work!")
-else:
-    print("❌ SOME CHECKS FAILED - Fix issues above")
-    print()
-    print("To install missing dependencies:")
-    print("  pip install -r nova-core/requirements.txt")
-print("=" * 60)
+print("OK" if ok else "FAILED")
+sys.exit(0 if ok else 1)

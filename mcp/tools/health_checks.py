@@ -1,8 +1,7 @@
-﻿"""Grouped runtime health checks for NOVA MCP tools."""
+"""Grouped health checks for the NOVA memory engine."""
 
 from __future__ import annotations
 
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,70 +17,55 @@ def _count_md_files(root: Path) -> int:
 def _age_days(path: Path) -> int | None:
     if not path.exists():
         return None
-    ts = path.stat().st_mtime
-    then = datetime.fromtimestamp(ts, tz=timezone.utc)
+    then = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
     now = datetime.now(timezone.utc)
     return max(0, int((now - then).total_seconds() // 86400))
 
 
 async def run_grouped_checks(workspace_root: Path) -> list[dict[str, str]]:
     cfg = resolve_paths(workspace_root)
-
-    core_files = [
-        cfg.core_md,
-        workspace_root / "mcp" / "nova_mcp_core_server.py",
-        workspace_root / "mcp" / "tools" / "paths.py",
-    ]
-    core_ok = sum(1 for p in core_files if p.exists())
-
-    vault_notes = _count_md_files(cfg.knowledge_root)
-    current_age = _age_days(cfg.current_md)
+    semantic_index = cfg.index_root / "semantic_index.json"
+    hash_file = cfg.index_root / "file_hashes.json"
 
     groups: list[dict[str, str]] = []
-    groups.append({
-        "name": "CORE",
-        "status": "OK" if core_ok == len(core_files) else "WARN",
-        "summary": f"MCP Tools 6 Tools | Python {sys.version_info.major}.{sys.version_info.minor} | Core Files {core_ok} vorhanden",
-    })
     groups.append({
         "name": "VAULT",
         "status": "OK" if cfg.knowledge_root.exists() else "WARN",
         "summary": (
-            f"Knowledge Root {'OK' if cfg.knowledge_root.exists() else 'MISSING'} | "
-            f"Notes {vault_notes} | WORKLOG {'OK' if cfg.worklog_md.exists() else 'MISSING'} | "
-            f"TICKETS {'OK' if cfg.tickets_md.exists() else 'MISSING'}"
+            f"knowledge_root={cfg.knowledge_root} | "
+            f"exists={cfg.knowledge_root.exists()} | "
+            f"markdown_files={_count_md_files(cfg.knowledge_root)}"
+        ),
+    })
+    groups.append({
+        "name": "INDEX",
+        "status": "OK" if semantic_index.exists() else "WARN",
+        "summary": (
+            f"index_root={cfg.index_root} | "
+            f"semantic_index={semantic_index.exists()} | "
+            f"file_hashes={hash_file.exists()} | "
+            f"age_days={_age_days(semantic_index)}"
         ),
     })
     groups.append({
         "name": "SEARCH",
         "status": "OK" if cfg.search_enabled else "WARN",
         "summary": (
-            f"Search {'enabled' if cfg.search_enabled else 'disabled'} | "
-            f"Chroma Path {'OK' if cfg.chroma_path.exists() else 'MISSING'}"
+            f"enabled={cfg.search_enabled} | "
+            f"embedding_model={cfg.embedding_model} | "
+            f"top_k={cfg.search_top_k}"
         ),
     })
     groups.append({
-        "name": "CONTENT",
+        "name": "BOUNDARY",
         "status": "OK",
-        "summary": "Tool surface minimal (v2 only)",
+        "summary": "memory/context only; no operator runtime responsibilities",
     })
-    groups.append({
-        "name": "TODAY",
-        "status": "OK",
-        "summary": (
-            "CURRENT "
-            + (f"{current_age}d alt" if current_age is not None else "MISSING")
-        ),
-    })
-
     return groups
 
 
 def format_grouped_simple(groups: list[dict[str, str]]) -> str:
-    lines: list[str] = []
-    for g in groups:
-        status = g.get("status", "INFO")
-        name = g.get("name", "GROUP")
-        summary = g.get("summary", "")
-        lines.append(f"[{status}] **{name}:** {summary}")
-    return "\n".join(lines)
+    return "\n".join(
+        f"[{group.get('status', 'INFO')}] **{group.get('name', 'GROUP')}:** {group.get('summary', '')}"
+        for group in groups
+    )

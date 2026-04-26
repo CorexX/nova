@@ -1,295 +1,198 @@
-﻿<div align="center">
+# NOVA 2.0
 
-# N O V A
+> Local-first Memory / Context System for agentic work.
 
-### **N**otes-based **O**rchestrated **V**irtual **A**ssistant
+NOVA 2.0 is a small, focused context layer. It does not operate, chat, schedule, or execute tasks. It remembers.
 
-[![Local-First](https://img.shields.io/badge/Local--First-Knowledge-22c55e?style=for-the-badge)](.)
-[![Agent Ready](https://img.shields.io/badge/Stateless-Agent_Ready-f97316?style=for-the-badge)](.)
-[![MCP Native](https://img.shields.io/badge/MCP-Native-8b5cf6?style=for-the-badge)](.)
-[![Token Efficient](https://img.shields.io/badge/Token-Efficient-ec4899?style=for-the-badge)](.)
+The project separates three responsibilities:
 
-*Persistenter Kontext fuer stateless Agenten.*  
-*Weniger Prompt-Last, schnellere Ergebnisse.*
-
-</div>
-
-## Projektvision
-
-Moderne Agenten sind stark, aber zustandslos. Kontext geht verloren, Entscheidungen bleiben fluechtig.
-NOVA baut deshalb ein persistentes, kontrolliertes Arbeitsgedaechtnis fuer reale Agentenarbeit.
-
-**NOVA ist kein Chat-Interface. NOVA ist eine Arbeitsumgebung fuer Agenten.**
-
-### Ein-Satz-Vision
-
-NOVA ist ein persistentes, agentenfaehiges Kontext- und Arbeitssystem, das selektive Kontextbereitstellung mit strukturierter Wissensverankerung verbindet.
-
-### Arbeitszyklus (Kern von NOVA)
-
-```
-Init -> Intent -> Context -> Action -> Persist -> Review
+```text
+Operator        -> plans and acts
+Context System  -> retrieves, packages, and persists relevant memory
+Knowledge Base  -> stores durable human-readable knowledge
 ```
 
-| Schritt | Ziel |
-|---------|------|
-| `Init` | Session und Basis-Kontext starten |
-| `Intent` | Nutzerabsicht einordnen (z. B. weiterarbeiten, neues Projekt, Frage, Workflow-Run) |
-| `Context` | Relevante Informationen selektiv laden |
-| `Action` | Agent arbeitet aktiv an Dateien, Code, Runbooks, Repos |
-| `Persist` | Erkenntnisse strukturiert zurueck in die Wissensbasis schreiben |
-| `Review` | Ergebnis und naechste Schritte transparent machen |
+NOVA is the **Context System** in that split. It exposes a minimal MCP interface over a Markdown knowledge base so any operator can ask: "What context matters here?" and "Where should this durable insight be stored?"
 
-### Produktprinzipien
+## Project Vision
 
-| Prinzip | Aussage |
-|---------|---------|
-| Persistenz vor Antwort | Relevante Arbeit erzeugt Wissen im System |
-| Append statt Overwrite | Historie bleibt nachvollziehbar |
-| Struktur-agnostisch, semantisch auswertbar | Keine starre Dokumentpflicht, aber nutzbare Metadaten und Relationen |
-| Kontext vor Aktion | Kein Handeln ohne aufgeloesten Arbeitskontext |
-| Transparenz | Quelle, Auswahlgrund und Sicherheitsgrad werden sichtbar |
+Modern AI operators are useful but stateless. They can reason over a task, but they forget decisions, project history, constraints, and source context unless every session is manually reloaded.
 
-### Was NOVA explizit nicht ist
+NOVA solves that missing layer:
 
-- Kein generischer Chatbot
-- Kein Kalender- oder Task-Assistent
-- Keine reine RAG-Engine
-- Keine starre Wissensplattform
+> NOVA turns a local Markdown knowledge base into a structured, searchable, source-attributed memory system.
 
-## Was NOVA ist
+The goal is not to replace a human-readable vault. The goal is to make that vault useful to operators without dumping the whole thing into a prompt.
 
-NOVA erweitert die Zusammenarbeit mit stateless Agenten (z. B. Copilot oder Codex) um eine fehlende Schicht:  
-**Kontext, der bleibt, waechst und wiederverwendbar ist.**
-Context-Orchestrierungs-Layer für Agenten.
+## What NOVA Is
 
-```
-  Ohne:   Session --> Recherche --> vergessen
-                      Session --> Recherche --> vergessen
-                                  Session --> Recherche --> vergessen
+- A local-first Memory / Context System
+- An MCP server with a deliberately small tool surface
+- A bridge between operators and a Markdown Knowledge Base
+- A context pack assembler with sources and confidence
+- A persistence helper for append-first knowledge updates
+- A rebuildable indexing layer over durable files
 
-  Mit:    Session ----+
-                      |---> Knowledge Base ---> alle Sessions nutzen es
-          Session ----+
-```
+## What NOVA Is Not
 
-## Kernnutzen
+NOVA is not an agent runtime.
 
-| Kontext mitnehmen | Verbindungen sichtbar | Strukturiert ablegen | Token sparen |
-|:------------------:|:---------------------:|:--------------------:|:------------:|
-| Arbeitskontext fuer Projekte dauerhaft speichern | Wissen ueber Sessions verknuepfen | Rohe Informationen in auffindbare Eintraege ueberfuehren | Direkte Arbeit statt wiederholt suchen |
+It does not own:
 
-## Warum das Token spart
+- chat sessions
+- personas
+- cron scheduling
+- messaging gateways
+- LLM provider configuration
+- autonomous planning
+- code execution
+- project orchestration
 
-```
-  Ohne:   Prompt --> sammle Kontext --> recherchiere --> Antwort
-                          (tokens)          (tokens)
+Those belong to an operator. NOVA only supplies memory and context.
 
-  Mit:    Prompt --> MCP Tool --> Antwort
-                      (1 call)
-```
+## Architecture
 
-| Ebene | Mechanismus | Effekt |
-|:-----:|-------------|--------|
-| **1** | Retrieval statt Prompt-Ballast | `nova_search_vault` liefert relevante Inhalte + Dateipfade |
-| **2** | Programmatische Wiederverwendung | MCP-Tools erledigen repetitive Aufgaben automatisch |
-| **3** | Gezielter Kontext | Agent bekommt passenden Ausschnitt, nicht alles |
-
-## search_vault
-
-`nova_search_vault` liefert semantisch passende Kontexteintraege aus der Knowledge-Base inklusive Dateipfade.
-
-```
-  Query --> Embeddings --> Match --> Docs + Paths
+```text
+                 +----------------+
+                 |    Operator    |
+                 | plans + acts   |
+                 +-------+--------+
+                         |
+                         | MCP
+                         v
+              +----------+-----------+
+              |      NOVA 2.0        |
+              | Memory / Context     |
+              +----------+-----------+
+                         |
+        +----------------+----------------+
+        |                                 |
+        v                                 v
++-------+---------+              +--------+--------+
+| Knowledge Base  |              | Derived Indexes |
+| Markdown + Git  |              | search/cache    |
++-----------------+              +-----------------+
 ```
 
-## Use Cases
+### Source of Truth
 
-| Use Case | Input | Output |
-|----------|-------|--------|
-| **Quelle → Wissen** | Artikel-Link | Strukturierter Eintrag |
-| **Video → Projekt** | Video-Content | Projektbezogene Insights |
-| **Doku → Notes** | PDF/Docs | Kernaussagen + offene Fragen |
-| **Meeting → Tasks** | Rohnotizen | Entscheidungen + Dokumentation |
-| **Code → Wissen** | Repository | Architektur-Dokumentation |
-| **Kontinuierliche Pflege** | Neue Quellen | Konsistentes, erweitertes Wissen |
+The Knowledge Base is the source of truth. Indexes are generated artifacts.
 
-## Architektur
-
-Klare Trennung von Framework und Wissen:
-
-```
-                    Agent (Copilot/Codex)
-                            |
-                       MCP Protocol
-                            |
-              nova-core <-------> nova-knowledge
-              (portable)          (private)
+```text
+Markdown files -> parser/indexer -> semantic_index.json / future SQLite FTS / graph
 ```
 
-**Startoptionen:** Neu starten (Template-Struktur) oder bestehende Wissensdatenbank anbinden.
+If an index is deleted, NOVA should be able to rebuild it from the Knowledge Base.
 
-## Betriebsprinzipien
+## Tool Surface
 
+NOVA intentionally exposes only four MCP tools:
+
+| Tool | Purpose |
+|---|---|
+| `nova_context_resolve` | Build a focused context response for a query |
+| `nova_knowledge_query` | Search the Knowledge Base semantically |
+| `nova_knowledge_update` | Append-first persistence for durable insights |
+| `nova_memory_maintain` | Health, validation, and indexing |
+
+Anything beyond this is suspicious until proven useful. Small interface, sharp axe.
+
+## Memory Principles
+
+1. **Markdown first** — humans can read and edit the source.
+2. **Indexes are disposable** — generated search data is not source truth.
+3. **Provenance required** — useful memory points back to files/sources.
+4. **Append before overwrite** — preserve history unless a patch is explicit.
+5. **Context is selected** — return the smallest useful context, not the biggest possible dump.
+6. **Boundary stays clean** — NOVA remembers; an operator acts.
+
+## Repository Layout
+
+```text
+nova/
+├── README.md
+├── CONTRACTS.md
+├── requirements.txt
+├── mcp/
+│   ├── nova_mcp_core_server.py
+│   ├── check_server.py
+│   ├── README.md
+│   └── tools/
+│       ├── common.py
+│       ├── context_resolve.py
+│       ├── health_checks.py
+│       ├── knowledge_query.py
+│       ├── knowledge_update.py
+│       ├── memory_maintain.py
+│       ├── paths.py
+│       └── search_shared.py
+├── meta/
+│   ├── ARCHITECTURE.md
+│   ├── PRINCIPLES.md
+│   ├── ROADMAP.md
+│   └── SYSTEM.md
+├── templates/
+│   └── knowledge/
+└── tests/
 ```
-  Start --> Init --> Intent --> Kontext --> Aktion --> Persistenz --> Review
-                                                        |             |
-                                                        +--> Worklog  +--> Naechster Schritt
+
+## Configuration
+
+NOVA reads configuration in this order:
+
+1. Environment variables
+2. `nova.toml`
+3. Defaults
+
+Common environment variables:
+
+```env
+NOVA_CORE_ROOT=/path/to/nova
+NOVA_KNOWLEDGE_ROOT=/path/to/nova-knowledge
+NOVA_INDEX_ROOT=/path/to/nova/.nova/index
+NOVA_SEARCH_ENABLED=true
+NOVA_EMBEDDING_MODEL=all-MiniLM-L6-v2
 ```
 
-| Prinzip | Regel |
-|---------|-------|
-| Session Start | Immer mit `nova_context_resolve(query="session init", include_inventory=true)` beginnen |
-| Persistieren | Ergebnisse in Vault speichern, nicht nur im Chat |
-| Append | Bestehende Notes erweitern, nicht ueberschreiben |
-| Kontextoekonomie | Kontext gezielt laden, budgetieren, deduplizieren, priorisieren |
-| Modular | Core lauffaehig ohne optionale Integrationen |
-
-Fallback bei Tool-Ausfall: Fehler kurz melden, `core/CORE.md` lokal lesen, mit lokalem Kontext fortfahren.
-
-<details>
-<summary>Mehr Details</summary>
-
-- `core/CORE.md` - Hauptidentitaet
-- `core/PRINCIPLES.md` - Detaillierte Prinzipien
-- `CONTRACTS.md` - API-Vertraege
-
-</details>
-
-## Quick Start
+## Running the MCP Server
 
 ```bash
-# 1) Repo klonen
-git clone https://github.com/dein-user/nova-core.git
-cd nova-core
-
-# 2) Setup starten
-python setup.py
-
-# 3) VS Code neu laden
-
-# 4) Neue Session starten
-nova_context_resolve(query="session init", include_inventory=true)
+python mcp/nova_mcp_core_server.py
 ```
 
-**Express Setup:** `python setup.py --quick` (nutzt Defaults)
+## Maintenance
 
-**Setup erstellt:**
+Run a lightweight local check:
 
-| Datei | Beschreibung |
-|-------|-------------|
-| `nova.toml` | Konfiguration |
-| `.vscode/mcp.json` | MCP-Server Config |
-| `.venv` | Virtual Environment |
-| `nova-knowledge/` | Grundstruktur (optional) |
-
-## Voraussetzungen
-
-| Requirement | Version |
-|-------------|-------|
-| Python | `3.11+` |
-| VS Code | Latest |
-| Copilot/Codex | oder MCP-faehiger Client |
-
-## Konfiguration
-
-<details>
-<summary><b>Standard Setup</b> - Im Normalfall reicht <code>setup.py</code></summary>
-
-Fuer Spezialfaelle via Environment:
-
-```env
-NOVA_CORE_ROOT=/abs/path/to/nova-core
-NOVA_KNOWLEDGE_ROOT=/abs/path/to/nova-knowledge
-NOVA_INDEX_ROOT=/abs/path/to/index-storage
+```bash
+python mcp/check_server.py
 ```
 
-</details>
-
-<details>
-<summary><b>Optional: n8n Integration</b></summary>
-
-```env
-N8N_BASE_URL=https://n8n.home
-N8N_API_KEY=your-n8n-api-key
-N8N_INSECURE_TLS=false
-```
-
-> Ohne n8n bleibt NOVA voll funktionsfaehig; nur `nova_n8n_*` sind deaktiviert.
-
-</details>
-
-## MCP in VS Code
+Rebuild the memory index through the MCP tool:
 
 ```json
 {
-  "servers": {
-    "nova-skills": {
-      "type": "stdio",
-      "command": "python",
-      "args": ["${workspaceFolder}/launcher.py"],
-      "cwd": "${workspaceFolder}"
-    }
-  }
+  "operation": "index",
+  "force": false
 }
 ```
 
-**Connection:** VS Code <-> stdio <-> launcher.py -> MCP Server -> 6 Tools
+## Development
 
-## MCP in Codex
-
-Codex nutzt `~/.codex/config.toml` fuer externe MCP-Server.
-
-```toml
-[mcp_servers.nova-skills]
-command = "python"
-args = ["C:/REPO/NOVA/nova/launcher.py"]
-cwd = "C:/REPO/NOVA/nova"
-startup_timeout_sec = 60
-env = { NOVA_PREWARM_INDEX_BACKEND = "1", PYTHONIOENCODING = "utf-8" }
-```
-
-Hinweise:
-- `startup_timeout_sec = 60` verhindert Start-Timeouts bei langsamerem Warmstart.
-- `NOVA_PREWARM_INDEX_BACKEND = "1"` aktiviert Prewarm beim Serverstart, damit spaetere Tool-Calls schneller reagieren.
-
-## Quality Gate
+Compile all Python files:
 
 ```bash
-python -m pytest mcp/tools/tests -q
+python -m compileall -q .
 ```
 
-## Struktur
+Run tests with the standard library test runner:
 
-```
-nova-core/                      nova-knowledge/
-├── core/                       ├── CURRENT.md
-│   ├── CORE.md                 ├── TICKETS.md
-│   └── PRINCIPLES.md           ├── WORKLOG.md
-├── mcp/                        ├── inbox/
-│   ├── nova_mcp_core_server.py ├── areas/
-│   └── tools/                  ├── projects/
-├── playbooks/                  ├── resources/
-├── playbooks/                  └── operations/
-├── templates/
-├── setup.py
-└── launcher.py
+```bash
+python -m unittest discover -s tests -v
 ```
 
-## Weiterfuehrend
+## Design Bias
 
-| Dokument | Inhalt |
-|----------|--------|
-| [CORE.md](core/CORE.md) | Hauptidentitaet & Regeln |
-| [PRINCIPLES.md](core/PRINCIPLES.md) | Detaillierte Prinzipien |
-| [CONTRACTS.md](CONTRACTS.md) | API-Vertraege |
-| [ARCHITECTURE.md](meta/ARCHITECTURE.md) | Systemarchitektur |
-| [ROADMAP.md](meta/ROADMAP.md) | Entwicklungsplan |
+NOVA should be boring infrastructure: predictable, auditable, local, and small.
 
-<div align="center">
-
-*Built with persistence in mind.*
-
-**[Documentation](meta/ARCHITECTURE.md)** · **[Roadmap](meta/ROADMAP.md)** · **[Changelog](meta/CHANGELOG.md)**
-
-</div>
+If a feature smells like operator behavior, it probably belongs outside NOVA.

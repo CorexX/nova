@@ -147,31 +147,24 @@ def _extract_numbered_section(md_text: str, heading: str, max_items: int = 8) ->
 
 
 def _core_directives(cfg, workspace_root: Path) -> dict:
-    core_md = cfg.core_md
-    if not core_md.exists():
+    principles_md = cfg.principles_md
+    if not principles_md.exists():
         return {
             "status": "unavailable",
-            "reason": "core_missing",
-            "core_path": rel_or_abs(core_md, workspace_root),
+            "reason": "principles_missing",
+            "path": rel_or_abs(principles_md, workspace_root),
         }
 
-    try:
-        text = core_md.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return {
-            "status": "unavailable",
-            "reason": "core_read_failed",
-            "core_path": rel_or_abs(core_md, workspace_root),
-        }
-
-    hard_rules = _extract_numbered_section(text, "Nicht verhandelbare Regeln", max_items=8)
-    priorities = _extract_numbered_section(text, "Prioritaet bei Konflikten", max_items=4)
     return {
         "status": "ok",
-        "core_path": rel_or_abs(core_md, workspace_root),
-        "hard_rules": hard_rules,
-        "priorities": priorities,
-        "fallback_policy": "Wenn session init fehlschlaegt: core/CORE.md lokal lesen und mit bestmoeglichem lokalen Kontext fortfahren.",
+        "path": rel_or_abs(principles_md, workspace_root),
+        "boundary": "NOVA provides memory/context only; an external operator performs actions.",
+        "rules": [
+            "Markdown knowledge base is the source of truth.",
+            "Generated indexes are disposable and rebuildable.",
+            "Every durable memory should preserve source/provenance.",
+            "Prefer append-first writes; avoid silent overwrites.",
+        ],
     }
 
 

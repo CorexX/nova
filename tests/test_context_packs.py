@@ -27,7 +27,12 @@ _mcp_types.TextContent = _TextContent
 _mcp_types.Tool = _Tool
 sys.modules.setdefault("mcp.types", _mcp_types)
 
-from mcp.tools import context_resolve, memory_maintain
+ROOT = Path(__file__).resolve().parents[1]
+MCP_ROOT = ROOT / "mcp"
+if str(MCP_ROOT) not in sys.path:
+    sys.path.insert(0, str(MCP_ROOT))
+
+from tools import context_resolve, memory_maintain
 
 
 class ChunkMetadataTests(unittest.TestCase):
@@ -60,6 +65,115 @@ We will keep Markdown as source of truth.
 
 
 class ContextPackTests(unittest.TestCase):
+    def test_context_resolve_dedupe_none_keeps_multiple_chunks_from_same_path(self):
+        original_search = context_resolve.semantic_search
+        original_env = dict(os.environ)
+        tempdir = tempfile.TemporaryDirectory()
+        try:
+            root = Path(tempdir.name)
+            knowledge = root / "knowledge"
+            knowledge.mkdir()
+            os.environ["NOVA_KNOWLEDGE_ROOT"] = str(knowledge)
+            os.environ["NOVA_SEARCH_ENABLED"] = "true"
+
+            def fake_search(chroma_path, query, top_k, log=None):
+                return [
+                    {
+                        "id": "projects/nova/architecture.md#1",
+                        "path": "projects/nova/architecture.md",
+                        "doc": "## Decision\nKeep four tools.",
+                        "distance": 0.1,
+                        "meta": {"id": "projects/nova/architecture.md#1", "path": "projects/nova/architecture.md", "section": "Decision", "memory_type": "decision", "chunk_index": 1},
+                    },
+                    {
+                        "id": "projects/nova/architecture.md#2",
+                        "path": "projects/nova/architecture.md",
+                        "doc": "## Constraints\nNo runtime behavior.",
+                        "distance": 0.2,
+                        "meta": {"id": "projects/nova/architecture.md#2", "path": "projects/nova/architecture.md", "section": "Constraints", "memory_type": "constraint", "chunk_index": 2},
+                    },
+                ]
+
+            context_resolve.semantic_search = fake_search
+            result = asyncio.run(context_resolve.execute({"query": "nova", "dedupe": "none", "token_budget": 900}, root))
+            payload = json.loads(result[0].text)
+        finally:
+            context_resolve.semantic_search = original_search
+            os.environ.clear()
+            os.environ.update(original_env)
+            tempdir.cleanup()
+
+        self.assertEqual(payload["dedupe"], "none")
+        self.assertEqual(len(payload["context_items"]), 2)
+        self.assertEqual(payload["context_items"][0]["citation"]["id"], "projects/nova/architecture.md#1")
+        self.assertEqual(payload["context_items"][1]["citation"]["id"], "projects/nova/architecture.md#2")
+
+    def test_context_resolve_dedupe_path_collapses_same_file(self):
+        original_search = context_resolve.semantic_search
+        original_env = dict(os.environ)
+        tempdir = tempfile.TemporaryDirectory()
+        try:
+            root = Path(tempdir.name)
+            knowledge = root / "knowledge"
+            knowledge.mkdir()
+            os.environ["NOVA_KNOWLEDGE_ROOT"] = str(knowledge)
+            os.environ["NOVA_SEARCH_ENABLED"] = "true"
+
+            def fake_search(chroma_path, query, top_k, log=None):
+                return [
+                    {"id": "p.md#1", "path": "p.md", "doc": "one", "distance": 0.1, "meta": {"id": "p.md#1", "path": "p.md", "section": "A", "chunk_index": 1}},
+                    {"id": "p.md#2", "path": "p.md", "doc": "two", "distance": 0.2, "meta": {"id": "p.md#2", "path": "p.md", "section": "B", "chunk_index": 2}},
+                ]
+
+            context_resolve.semantic_search = fake_search
+            result = asyncio.run(context_resolve.execute({"query": "nova", "dedupe": "path", "token_budget": 900}, root))
+            payload = json.loads(result[0].text)
+        finally:
+            context_resolve.semantic_search = original_search
+            os.environ.clear()
+            os.environ.update(original_env)
+            tempdir.cleanup()
+
+        self.assertEqual(payload["dedupe"], "path")
+        self.assertEqual(len(payload["context_items"]), 1)
+        self.assertEqual(payload["context_items"][0]["citation"]["id"], "p.md#1")
+
+    def test_context_resolve_enforces_approximate_response_budget(self):
+        original_search = context_resolve.semantic_search
+        original_env = dict(os.environ)
+        tempdir = tempfile.TemporaryDirectory()
+        try:
+            root = Path(tempdir.name)
+            knowledge = root / "knowledge"
+            knowledge.mkdir()
+            os.environ["NOVA_KNOWLEDGE_ROOT"] = str(knowledge)
+            os.environ["NOVA_SEARCH_ENABLED"] = "true"
+
+            def fake_search(chroma_path, query, top_k, log=None):
+                return [
+                    {
+                        "id": f"projects/nova/long.md#{idx}",
+                        "path": f"projects/nova/long-{idx}.md",
+                        "doc": "## Fact\n" + ("very long context " * 80),
+                        "distance": 0.1 + (idx * 0.01),
+                        "meta": {"id": f"projects/nova/long.md#{idx}", "path": f"projects/nova/long-{idx}.md", "section": "Fact", "memory_type": "fact", "chunk_index": idx},
+                    }
+                    for idx in range(8)
+                ]
+
+            context_resolve.semantic_search = fake_search
+            result = asyncio.run(context_resolve.execute({"query": "nova", "token_budget": 300, "dedupe": "none"}, root))
+            payload = json.loads(result[0].text)
+        finally:
+            context_resolve.semantic_search = original_search
+            os.environ.clear()
+            os.environ.update(original_env)
+            tempdir.cleanup()
+
+        self.assertTrue(payload["budget"]["applied"])
+        self.assertLessEqual(payload["budget"]["estimated_tokens"], payload["token_budget"])
+        self.assertLess(len(payload["context_items"]), 8)
+
     def test_context_resolve_returns_structured_context_pack(self):
         original_search = context_resolve.semantic_search
         original_env = dict(os.environ)

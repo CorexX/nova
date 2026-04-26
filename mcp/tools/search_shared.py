@@ -213,6 +213,8 @@ def _search_from_semantic_index(
                 "line_start": item.get("line_start"),
                 "line_end": item.get("line_end"),
                 "memory_type": item.get("memory_type", "fact"),
+                "lifecycle_status": item.get("lifecycle_status", "active"),
+                "supersedes": item.get("supersedes", []),
                 "chunk_index": item.get("chunk_index"),
             },
             "distance": 1.0 - sim,
@@ -288,6 +290,9 @@ def _ensure_hybrid_entry(by_id: dict[str, dict], item: dict) -> tuple[str, dict]
         merged["id"] = str(merged.get("id") or meta.get("id") or key)
         merged["path"] = str(merged.get("path") or meta.get("path") or "")
         merged["doc"] = str(merged.get("doc") or merged.get("text") or "")
+        for field, default in (("lifecycle_status", "active"), ("supersedes", [])):
+            if field not in meta:
+                meta[field] = item.get(field, default)
         merged["hybrid_signals"] = {"semantic": 0.0, "full_text": 0.0, "graph": 0.0}
         by_id[key] = merged
     return key, by_id[key]

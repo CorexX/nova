@@ -47,6 +47,7 @@ Output:
 - `sources`
 - `confidence`
 - optional `inventory`
+- lifecycle status and supersedes metadata on context items and citations when indexed
 - optional memory boundary directives for `query="session init"`
 
 ### `nova_knowledge_query`
@@ -57,10 +58,13 @@ Input:
 - `project` optional
 - `topic` optional
 - `limit` optional
+- `mode` optional: `semantic`, `full_text`, `hybrid`, or `graph`
+- `dedupe` optional: `none`, `path`, or `section`
+- `filters` optional for `full_text`, including `memory_type`, `project`, `section`, `tag`, `concept`, `lifecycle_status`, and `supersedes`
 
 Output:
 
-- ranked `matches` with path, snippet, score, and relevance reason
+- ranked `matches` with path, snippet, score, relevance reason, lifecycle status, supersedes metadata, and citations
 
 ### `nova_knowledge_update`
 

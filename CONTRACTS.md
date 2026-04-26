@@ -72,6 +72,7 @@ Required output qualities:
 
 - query echoed back
 - selected items include path and snippet
+- selected items and citations expose lifecycle `status` and `supersedes` metadata when indexed
 - sources include path and score when available
 - confidence is explicit
 - inventory is optional
@@ -86,6 +87,8 @@ Required output qualities:
 - no hallucinated paths
 - no hidden source selection
 - project/topic filters are path-based unless a richer index exists
+- SQLite FTS facets may filter by `memory_type`, `project`, `section`, `tag`, `concept`, `lifecycle_status`, and `supersedes`
+- matches and citations expose lifecycle `status` and `supersedes` metadata when indexed
 - empty results are valid and explicit
 
 ## Write Contract
@@ -99,6 +102,7 @@ Rules:
 - Existing notes must not be silently overwritten.
 - Each write should include project/topic/source/confidence where available.
 - Each write may include `memory_type`, `scope`, lifecycle `status`, and `supersedes` metadata.
+- Lifecycle `status` and `supersedes` metadata are indexed and returned by retrieval tools so operators can see replacement chains instead of treating old memories as context-equivalent.
 - Lifecycle `status` values are controlled: `active`, `candidate`, `superseded`, `stale`, `archived`, `rejected`.
 - Patch-based writes must be explicit and reviewable.
 

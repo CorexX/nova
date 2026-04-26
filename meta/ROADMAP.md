@@ -22,7 +22,7 @@
 ## Phase 4: Patch-Based Memory Writes
 
 - Add proposed patch workflow.
-- Track superseded/stale memories.
+- Track superseded/stale memories in indexed chunks, query results, context packs, facets, and graph-lite metadata.
 - Add duplicate and contradiction checks.
 
 ## Phase 5: Lightweight Temporal Graph

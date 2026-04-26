@@ -160,6 +160,8 @@ def _citation(path: str, meta: dict) -> dict:
         "line_start": meta.get("line_start"),
         "line_end": meta.get("line_end"),
         "chunk_index": meta.get("chunk_index"),
+        "lifecycle_status": meta.get("lifecycle_status") or "active",
+        "supersedes": meta.get("supersedes") or [],
     }
 
 
@@ -171,6 +173,8 @@ def _pack_entry(item: dict) -> dict:
         "line_end": item.get("line_end"),
         "snippet": item.get("snippet", ""),
         "score": item.get("score", 0.0),
+        "lifecycle_status": item.get("lifecycle_status", "active"),
+        "supersedes": item.get("supersedes", []),
     }
 
 
@@ -325,6 +329,8 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
             "line_start": meta.get("line_start"),
             "line_end": meta.get("line_end"),
             "memory_type": meta.get("memory_type") or "fact",
+            "lifecycle_status": meta.get("lifecycle_status") or "active",
+            "supersedes": meta.get("supersedes") or [],
             "citation": _citation(path, meta),
         })
         if len(items) >= top_k:
@@ -348,6 +354,8 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
             "why_selected": i["reason"],
             "section": i.get("section", ""),
             "memory_type": i.get("memory_type", "fact"),
+            "lifecycle_status": i.get("lifecycle_status", "active"),
+            "supersedes": i.get("supersedes", []),
             "citation": i.get("citation") or _citation(i["path"], i),
         }
         for i in items

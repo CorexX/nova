@@ -107,6 +107,160 @@ class IndexStoreTests(unittest.TestCase):
             self.assertGreater(matches[0]["score"], matches[1]["score"])
             self.assertLess(matches[0]["distance"], matches[1]["distance"])
 
+    def test_rebuild_sqlite_index_extracts_graph_nodes_and_edges(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            index_root = Path(tempdir) / "index"
+            index_store.rebuild_sqlite_index(index_root, [
+                {
+                    "id": "projects/nova/graph.md#0",
+                    "path": "projects/nova/graph.md",
+                    "section": "Graph Retrieval",
+                    "line_start": 1,
+                    "line_end": 5,
+                    "memory_type": "decision",
+                    "chunk_index": 0,
+                    "text": "# Graph Retrieval\nUse [[SQLite FTS]] with #memory graph expansion.",
+                    "embedding": [0.1],
+                }
+            ])
+
+            db = sqlite3.connect(index_root / "nova_index.sqlite")
+            try:
+                nodes = {row[0]: row[1] for row in db.execute("select id, type from nodes")}
+                edges = {(row[0], row[1], row[2]) for row in db.execute("select source_id, relation, target_id from edges")}
+            finally:
+                db.close()
+
+            self.assertEqual(nodes["file:projects/nova/graph.md"], "file")
+            self.assertEqual(nodes["chunk:projects/nova/graph.md#0"], "chunk")
+            self.assertEqual(nodes["concept:sqlite-fts"], "concept")
+            self.assertEqual(nodes["tag:memory"], "tag")
+            self.assertIn(("file:projects/nova/graph.md", "contains", "chunk:projects/nova/graph.md#0"), edges)
+            self.assertIn(("chunk:projects/nova/graph.md#0", "mentions", "concept:sqlite-fts"), edges)
+            self.assertIn(("chunk:projects/nova/graph.md#0", "tagged", "tag:memory"), edges)
+
+    def test_graph_search_expands_from_seed_chunk_to_related_chunks(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            index_root = Path(tempdir) / "index"
+            index_store.rebuild_sqlite_index(index_root, [
+                {
+                    "id": "projects/nova/question.md#0",
+                    "path": "projects/nova/question.md",
+                    "section": "Question",
+                    "line_start": 1,
+                    "line_end": 3,
+                    "memory_type": "question",
+                    "chunk_index": 0,
+                    "text": "How do we improve exact lookup? See [[SQLite FTS]].",
+                    "embedding": [0.1],
+                },
+                {
+                    "id": "projects/nova/decision.md#0",
+                    "path": "projects/nova/decision.md",
+                    "section": "SQLite FTS",
+                    "line_start": 1,
+                    "line_end": 4,
+                    "memory_type": "decision",
+                    "chunk_index": 0,
+                    "text": "# SQLite FTS\nDecision: use full-text search for exact commands and ticket IDs.",
+                    "embedding": [0.2],
+                },
+            ])
+
+            matches = index_store.graph_search(index_root, "exact lookup", limit=5)
+
+            self.assertEqual([match["id"] for match in matches], [
+                "projects/nova/question.md#0",
+                "projects/nova/decision.md#0",
+            ])
+            self.assertEqual(matches[0]["why_relevant"], "graph_seed_full_text")
+            self.assertEqual(matches[1]["why_relevant"], "graph_neighbor")
+            self.assertIn("concept:sqlite-fts", matches[1]["meta"]["graph_via"])
+
+    def test_graph_search_expands_through_shared_memory_type(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            index_root = Path(tempdir) / "index"
+            index_store.rebuild_sqlite_index(index_root, [
+                {
+                    "id": "projects/nova/source.md#0",
+                    "path": "projects/nova/source.md",
+                    "section": "Decision A",
+                    "line_start": 1,
+                    "line_end": 2,
+                    "memory_type": "decision",
+                    "chunk_index": 0,
+                    "text": "Decision: exact lookup needs graph expansion.",
+                    "embedding": [0.1],
+                },
+                {
+                    "id": "projects/nova/related.md#0",
+                    "path": "projects/nova/related.md",
+                    "section": "Decision B",
+                    "line_start": 1,
+                    "line_end": 2,
+                    "memory_type": "decision",
+                    "chunk_index": 0,
+                    "text": "Decision: graph retrieval should connect related decisions.",
+                    "embedding": [0.2],
+                },
+            ])
+
+            matches = index_store.graph_search(index_root, "exact lookup", limit=5)
+
+            self.assertEqual([match["id"] for match in matches], [
+                "projects/nova/source.md#0",
+                "projects/nova/related.md#0",
+            ])
+            self.assertIn("memory_type:decision", matches[1]["meta"]["graph_via"])
+
+    def test_graph_search_reserves_budget_for_neighbors_when_many_seed_chunks_match(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            index_root = Path(tempdir) / "index"
+            items = [
+                {
+                    "id": "projects/nova/seed.md#0",
+                    "path": "projects/nova/seed.md",
+                    "section": "Seed",
+                    "line_start": 1,
+                    "line_end": 2,
+                    "memory_type": "question",
+                    "chunk_index": 0,
+                    "text": "exact lookup exact lookup exact lookup [[Shared Graph Topic]]",
+                    "embedding": [0.1],
+                },
+                {
+                    "id": "projects/nova/neighbor.md#0",
+                    "path": "projects/nova/neighbor.md",
+                    "section": "Shared Graph Topic",
+                    "line_start": 1,
+                    "line_end": 2,
+                    "memory_type": "decision",
+                    "chunk_index": 0,
+                    "text": "# Shared Graph Topic\nThis neighbor explains graph expansion.",
+                    "embedding": [0.2],
+                },
+            ]
+            for idx in range(8):
+                items.append({
+                    "id": f"projects/nova/noisy-{idx}.md#0",
+                    "path": f"projects/nova/noisy-{idx}.md",
+                    "section": f"Noisy {idx}",
+                    "line_start": 1,
+                    "line_end": 2,
+                    "memory_type": "fact",
+                    "chunk_index": 0,
+                    "text": "exact lookup filler text that also matches the seed query.",
+                    "embedding": [0.3],
+                })
+            index_store.rebuild_sqlite_index(index_root, items)
+
+            matches = index_store.graph_search(index_root, "exact lookup", limit=5)
+
+            ids = [match["id"] for match in matches]
+            self.assertIn("projects/nova/seed.md#0", ids)
+            self.assertIn("projects/nova/neighbor.md#0", ids)
+            self.assertLess(len(matches), 6)
+
     def test_rebuild_sqlite_index_replaces_stale_rows(self):
         with tempfile.TemporaryDirectory() as tempdir:
             index_root = Path(tempdir) / "index"

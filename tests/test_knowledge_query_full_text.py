@@ -81,8 +81,62 @@ class KnowledgeQueryFullTextTests(unittest.TestCase):
     def test_tool_schema_exposes_search_mode(self):
         tool = knowledge_query.get_tool_definition(Path.cwd())
         mode = tool.inputSchema["properties"]["mode"]
-        self.assertEqual(mode["enum"], ["semantic", "full_text", "hybrid"])
+        self.assertEqual(mode["enum"], ["semantic", "full_text", "hybrid", "graph"])
         self.assertEqual(mode["default"], "semantic")
+
+    def test_knowledge_query_graph_mode_uses_graph_search(self):
+        original_env = dict(os.environ)
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            knowledge = root / "knowledge"
+            index_root = root / ".nova" / "index"
+            knowledge.mkdir()
+            os.environ["NOVA_KNOWLEDGE_ROOT"] = str(knowledge)
+            os.environ["NOVA_INDEX_ROOT"] = str(index_root)
+            os.environ["NOVA_SEARCH_ENABLED"] = "true"
+            try:
+                index_store.rebuild_sqlite_index(index_root, [
+                    {
+                        "id": "projects/nova/question.md#0",
+                        "path": "projects/nova/question.md",
+                        "section": "Question",
+                        "line_start": 1,
+                        "line_end": 3,
+                        "memory_type": "question",
+                        "chunk_index": 0,
+                        "text": "How do we improve exact lookup? See [[SQLite FTS]].",
+                        "embedding": [0.1],
+                    },
+                    {
+                        "id": "projects/nova/decision.md#0",
+                        "path": "projects/nova/decision.md",
+                        "section": "SQLite FTS",
+                        "line_start": 1,
+                        "line_end": 4,
+                        "memory_type": "decision",
+                        "chunk_index": 0,
+                        "text": "# SQLite FTS\nDecision: use full-text search for exact commands and ticket IDs.",
+                        "embedding": [0.2],
+                    },
+                ])
+
+                result = asyncio.run(knowledge_query.execute(
+                    {"query": "exact lookup", "mode": "graph", "limit": 5},
+                    root,
+                ))
+                payload = json.loads(result[0].text)
+            finally:
+                os.environ.clear()
+                os.environ.update(original_env)
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["mode"], "graph")
+        self.assertEqual([match["id"] for match in payload["matches"]], [
+            "projects/nova/question.md#0",
+            "projects/nova/decision.md#0",
+        ])
+        self.assertEqual(payload["matches"][1]["why_relevant"], "graph_neighbor")
+        self.assertIn("concept:sqlite-fts", payload["matches"][1]["graph_via"])
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ from pathlib import Path
 from mcp.types import TextContent, Tool
 
 from .paths import resolve_paths
-from .search_shared import tool_logger, semantic_search, full_text_search, hybrid_search
+from .search_shared import tool_logger, semantic_search, full_text_search, hybrid_search, graph_search
 from .common import json_text, short_snippet
 
 
@@ -24,7 +24,7 @@ def get_tool_definition(workspace_root: Path) -> Tool:
                 "limit": {"type": "integer", "default": 5, "description": "Maximale Trefferanzahl"},
                 "mode": {
                     "type": "string",
-                    "enum": ["semantic", "full_text", "hybrid"],
+                    "enum": ["semantic", "full_text", "hybrid", "graph"],
                     "default": "semantic",
                     "description": "Suchmodus: semantisch, SQLite-FTS oder kombiniert",
                 },
@@ -48,7 +48,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     topic = str(args.get("topic", "")).strip().lower()
     limit = max(1, min(20, int(args.get("limit", 5))))
     mode = str(args.get("mode", "semantic")).strip().lower()
-    if mode not in {"semantic", "full_text", "hybrid"}:
+    if mode not in {"semantic", "full_text", "hybrid", "graph"}:
         mode = "semantic"
     dedupe = str(args.get("dedupe", "section")).strip().lower()
     if dedupe not in {"none", "path", "section"}:
@@ -69,6 +69,8 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     try:
         if mode == "full_text":
             results = full_text_search(str(cfg.index_root), query, limit * 3, log)
+        elif mode == "graph":
+            results = graph_search(str(cfg.index_root), query, limit * 3, log)
         elif mode == "hybrid":
             results = hybrid_search(str(cfg.chroma_path), str(cfg.index_root), query, limit * 3, log)
         else:
@@ -111,7 +113,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         distance = float(item.get("distance", 1.0))
         score = float(item.get("score", max(0.0, 1.0 - distance)))
         doc = str(item.get("doc") or item.get("text") or "")
-        matches.append({
+        match = {
             "id": match_id,
             "path": path,
             "section": meta.get("section") or "",
@@ -128,7 +130,10 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
                 "line_start": meta.get("line_start"),
                 "line_end": meta.get("line_end"),
             },
-        })
+        }
+        if meta.get("graph_via") is not None:
+            match["graph_via"] = meta.get("graph_via")
+        matches.append(match)
         if len(matches) >= limit:
             break
 

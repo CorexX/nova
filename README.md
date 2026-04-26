@@ -54,13 +54,25 @@ Those belong to an operator. NOVA only supplies memory and context.
 
 NOVA combines three search engines behind the memory/query tools:
 
-| Engine | Strength |
-|---|---|
-| Semantic Search | Finds meaning, synonyms, and conceptual similarity |
-| SQLite Full-Text Search | Finds exact terms, names, IDs, paths, and commands |
-| Graph-lite Retrieval | Finds related concepts, memory types, and neighborhood evidence |
+| Engine | Technology | Upstream / Maintainer | Strength |
+|---|---|---|---|
+| Semantic Search | [Sentence Transformers](https://www.sbert.net/) using `all-MiniLM-L6-v2` | [UKP Lab / Sentence Transformers project](https://www.sbert.net/) | Finds meaning, synonyms, and conceptual similarity |
+| SQLite Full-Text Search | [SQLite FTS5](https://www.sqlite.org/fts5.html) | [SQLite project](https://www.sqlite.org/) | Finds exact terms, names, IDs, paths, and commands |
+| Graph-lite Retrieval | NOVA's local graph-lite index over Markdown metadata and memory relations | Internal NOVA component | Finds related concepts, memory types, and neighborhood evidence |
 
 `hybrid` mode fuses those signals into one ranked result set. Vector search is only one sensor, not the whole brain.
+
+## Technology Stack
+
+| Layer | Technology | Upstream / Vendor |
+|---|---|---|
+| Runtime | [Python](https://www.python.org/) | [Python Software Foundation](https://www.python.org/psf/) |
+| Agent protocol | [Model Context Protocol](https://modelcontextprotocol.io/) | [Anthropic](https://www.anthropic.com/) / MCP project |
+| Knowledge format | [Markdown](https://daringfireball.net/projects/markdown/) | [Daring Fireball](https://daringfireball.net/) |
+| Versioning | [Git](https://git-scm.com/) | [Git project](https://git-scm.com/) |
+| Full-text index | [SQLite FTS5](https://www.sqlite.org/fts5.html) | [SQLite project](https://www.sqlite.org/) |
+| Embeddings | [Sentence Transformers](https://www.sbert.net/) | [UKP Lab](https://www.informatik.tu-darmstadt.de/ukp/ukp_home/index.en.jsp) / Sentence Transformers project |
+| Tests | [pytest](https://docs.pytest.org/) | [pytest project](https://docs.pytest.org/) |
 
 ## Architecture
 

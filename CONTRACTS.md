@@ -98,7 +98,9 @@ Rules:
 - Writes are append-first.
 - Existing notes must not be silently overwritten.
 - Each write should include project/topic/source/confidence where available.
-- Later patch-based writes should be explicit and reviewable.
+- Each write may include `memory_type`, `scope`, lifecycle `status`, and `supersedes` metadata.
+- Lifecycle `status` values are controlled: `active`, `candidate`, `superseded`, `stale`, `archived`, `rejected`.
+- Patch-based writes must be explicit and reviewable.
 
 ## Maintenance Contract
 

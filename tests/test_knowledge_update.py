@@ -119,17 +119,35 @@ class KnowledgeUpdateTests(unittest.TestCase):
         self.assertIn("target_path", payload["message"])
         self.assertEqual(payload["written_paths"], [])
 
-    def test_invalid_memory_type_and_scope_are_rejected(self):
+    def test_invalid_memory_type_scope_and_lifecycle_status_are_rejected(self):
         payload = self._execute({
             "content": "Bad metadata.",
             "source": "unit-test",
             "memory_type": "runtime",
             "scope": "cron",
+            "status": "maybe",
         })
 
         self.assertEqual(payload["status"], "error")
         self.assertIn("memory_type", payload["validation_errors"])
         self.assertIn("scope", payload["validation_errors"])
+        self.assertIn("status", payload["validation_errors"])
+
+    def test_append_can_write_candidate_lifecycle_status(self):
+        payload = self._execute({
+            "content": "Candidate memory needs human review.",
+            "source": "unit-test",
+            "topic": "lifecycle",
+            "memory_type": "fact",
+            "scope": "project",
+            "status": "candidate",
+            "mode": "append",
+        })
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["entry"]["status"], "candidate")
+        note_path = Path(payload["written_paths"][0])
+        self.assertIn("status: candidate", note_path.read_text(encoding="utf-8"))
 
     def test_propose_patch_creates_reviewable_patch_without_modifying_target(self):
         target = self.knowledge / "curated" / "memory.md"

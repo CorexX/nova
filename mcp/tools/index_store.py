@@ -66,8 +66,17 @@ def _init_schema(db: sqlite3.Connection) -> None:
             evidence_line_end integer,
             primary key (source_id, relation, target_id, evidence_path, evidence_line_start)
         );
+        create table if not exists facets (
+            chunk_id text not null,
+            facet_type text not null,
+            facet_value text not null,
+            primary key (chunk_id, facet_type, facet_value),
+            foreign key (chunk_id) references chunks(id) on delete cascade
+        );
         create index if not exists idx_edges_source on edges(source_id);
         create index if not exists idx_edges_target on edges(target_id);
+        create index if not exists idx_facets_type_value on facets(facet_type, facet_value);
+        create index if not exists idx_facets_chunk on facets(chunk_id);
         """
     )
 
@@ -158,11 +167,97 @@ def _extract_graph_rows(items: list[dict[str, Any]]) -> tuple[list[tuple], list[
     return list(nodes.values()), list(edges)
 
 
+def _path_project(path: str) -> str:
+    parts = [part for part in Path(path).parts if part]
+    if len(parts) >= 2 and parts[0].lower() == "projects":
+        return _slug(parts[1])
+    return ""
+
+
+def _extract_facet_rows(items: list[dict[str, Any]]) -> list[tuple[str, str, str]]:
+    rows: set[tuple[str, str, str]] = set()
+    for item in items:
+        item_id = str(item.get("id") or "")
+        path = str(item.get("path") or "")
+        text = str(item.get("text") or item.get("doc") or "")
+        if not item_id or not path:
+            continue
+        memory_type = str(item.get("memory_type") or "fact").strip().lower() or "fact"
+        section = str(item.get("section") or "").strip()
+        project = _path_project(path)
+        rows.add((item_id, "memory_type", _slug(memory_type)))
+        if project:
+            rows.add((item_id, "project", project))
+        if section:
+            rows.add((item_id, "section", _slug(section)))
+        for link in re.findall(r"\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]", text):
+            label = link.strip()
+            if label:
+                rows.add((item_id, "concept", _slug(label)))
+        for tag in re.findall(r"(?<!\w)#([A-Za-z0-9_/-]+)", text):
+            label = tag.strip("/").lower()
+            if label:
+                rows.add((item_id, "tag", label))
+    return sorted(rows)
+
+
+def _normalize_filters(filters: dict[str, Any] | None) -> dict[str, list[str]]:
+    normalized: dict[str, list[str]] = {}
+    if not isinstance(filters, dict):
+        return normalized
+    aliases = {"tags": "tag", "concepts": "concept", "projects": "project", "memory_types": "memory_type"}
+    for raw_key, raw_value in filters.items():
+        key = aliases.get(str(raw_key).strip().lower(), str(raw_key).strip().lower())
+        if not key:
+            continue
+        values = raw_value if isinstance(raw_value, list) else [raw_value]
+        clean_values: list[str] = []
+        for value in values:
+            if value is None:
+                continue
+            text = str(value).strip().lower()
+            if not text:
+                continue
+            clean_values.append(text if key == "tag" else _slug(text))
+        if clean_values:
+            normalized[key] = sorted(set(clean_values))
+    return normalized
+
+
+def _facet_map(db: sqlite3.Connection, chunk_ids: list[str]) -> dict[str, dict[str, list[str]]]:
+    if not chunk_ids:
+        return {}
+    placeholders = ",".join("?" for _ in chunk_ids)
+    rows = db.execute(
+        f"select chunk_id, facet_type, facet_value from facets where chunk_id in ({placeholders}) order by facet_type, facet_value",
+        chunk_ids,
+    ).fetchall()
+    by_chunk: dict[str, dict[str, list[str]]] = {}
+    for row in rows:
+        by_chunk.setdefault(row["chunk_id"], {}).setdefault(row["facet_type"], []).append(row["facet_value"])
+    return by_chunk
+
+
+def _filter_clause(filters: dict[str, Any] | None) -> tuple[str, list[str], dict[str, list[str]]]:
+    normalized = _normalize_filters(filters)
+    clauses: list[str] = []
+    params: list[str] = []
+    for idx, (facet_type, values) in enumerate(normalized.items()):
+        placeholders = ",".join("?" for _ in values)
+        clauses.append(
+            f"exists (select 1 from facets f{idx} where f{idx}.chunk_id = c.id and f{idx}.facet_type = ? and f{idx}.facet_value in ({placeholders}))"
+        )
+        params.append(facet_type)
+        params.extend(values)
+    return (" and " + " and ".join(clauses) if clauses else "", params, normalized)
+
+
 def rebuild_sqlite_index(index_root: str | Path, items: list[dict[str, Any]]) -> dict[str, Any]:
     """Rebuild the SQLite metadata and FTS index from semantic index items."""
     with _connect(index_root) as db:
         _init_schema(db)
         db.execute("delete from chunks_fts")
+        db.execute("delete from facets")
         db.execute("delete from edges")
         db.execute("delete from nodes")
         db.execute("delete from chunks")
@@ -212,9 +307,14 @@ def rebuild_sqlite_index(index_root: str | Path, items: list[dict[str, Any]]) ->
             fts_rows,
         )
         node_rows, edge_rows = _extract_graph_rows(items)
+        facet_rows = _extract_facet_rows(items)
         db.executemany(
             "insert or replace into nodes(id, type, label, path, metadata_json) values (?, ?, ?, ?, ?)",
             node_rows,
+        )
+        db.executemany(
+            "insert or replace into facets(chunk_id, facet_type, facet_value) values (?, ?, ?)",
+            facet_rows,
         )
         db.executemany(
             """
@@ -233,11 +333,12 @@ def rebuild_sqlite_index(index_root: str | Path, items: list[dict[str, Any]]) ->
         "chunks": len(rows),
         "nodes": len(node_rows),
         "edges": len(edge_rows),
+        "facets": len(facet_rows),
         "index_file": str(sqlite_index_path(index_root)),
     }
 
 
-def _row_to_result(row: sqlite3.Row, best_rank_abs: float) -> dict[str, Any]:
+def _row_to_result(row: sqlite3.Row, best_rank_abs: float, facets: dict[str, list[str]] | None = None) -> dict[str, Any]:
     rank_abs = float(row["rank_abs"] or 0.0)
     score = rank_abs / best_rank_abs if best_rank_abs > 0.0 else 1.0
     distance = 1.0 - score
@@ -250,6 +351,8 @@ def _row_to_result(row: sqlite3.Row, best_rank_abs: float) -> dict[str, Any]:
         "memory_type": row["memory_type"] or "fact",
         "chunk_index": row["chunk_index"],
     }
+    if facets is not None:
+        meta["facets"] = facets
     return {
         "id": row["id"],
         "path": row["path"],
@@ -286,7 +389,7 @@ def _chunk_row_to_result(row: sqlite3.Row, why_relevant: str, score: float, dist
     }
 
 
-def full_text_search(index_root: str | Path, query: str, limit: int = 5) -> list[dict[str, Any]]:
+def full_text_search(index_root: str | Path, query: str, limit: int = 5, filters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Search the SQLite FTS index and return chunk-shaped results."""
     db_path = sqlite_index_path(index_root)
     if not db_path.exists() or not query.strip():
@@ -294,20 +397,21 @@ def full_text_search(index_root: str | Path, query: str, limit: int = 5) -> list
     safe_limit = max(1, min(50, int(limit)))
     with _connect(index_root) as db:
         _init_schema(db)
+        filter_sql, filter_params, _ = _filter_clause(filters)
         try:
             rows = db.execute(
-                """
+                f"""
                 select
                     c.id, c.path, c.section, c.line_start, c.line_end,
                     c.memory_type, c.chunk_index, c.text,
                     abs(bm25(chunks_fts)) as rank_abs
                 from chunks_fts
                 join chunks c on c.id = chunks_fts.id
-                where chunks_fts match ?
+                where chunks_fts match ?{filter_sql}
                 order by bm25(chunks_fts)
                 limit ?
                 """,
-                (query, safe_limit),
+                [query, *filter_params, safe_limit],
             ).fetchall()
         except sqlite3.OperationalError:
             # FTS query syntax is picky; quote terms for user-facing plain text search.
@@ -316,21 +420,66 @@ def full_text_search(index_root: str | Path, query: str, limit: int = 5) -> list
             if not quoted_query:
                 return []
             rows = db.execute(
-                """
+                f"""
                 select
                     c.id, c.path, c.section, c.line_start, c.line_end,
                     c.memory_type, c.chunk_index, c.text,
                     abs(bm25(chunks_fts)) as rank_abs
                 from chunks_fts
                 join chunks c on c.id = chunks_fts.id
-                where chunks_fts match ?
+                where chunks_fts match ?{filter_sql}
                 order by bm25(chunks_fts)
                 limit ?
                 """,
-                (quoted_query, safe_limit),
+                [quoted_query, *filter_params, safe_limit],
             ).fetchall()
+        facet_by_chunk = _facet_map(db, [str(row["id"]) for row in rows])
     best_rank_abs = max((float(row["rank_abs"] or 0.0) for row in rows), default=0.0)
-    return [_row_to_result(row, best_rank_abs) for row in rows]
+    return [_row_to_result(row, best_rank_abs, facet_by_chunk.get(str(row["id"]), {})) for row in rows]
+
+
+def facet_counts(index_root: str | Path, query: str, filters: dict[str, Any] | None = None) -> dict[str, dict[str, int]]:
+    """Return facet value counts for chunks matching a full-text query and optional filters."""
+    db_path = sqlite_index_path(index_root)
+    if not db_path.exists() or not query.strip():
+        return {}
+    with _connect(index_root) as db:
+        _init_schema(db)
+        filter_sql, filter_params, _ = _filter_clause(filters)
+        try:
+            rows = db.execute(
+                f"""
+                select f.facet_type, f.facet_value, count(distinct c.id) as count
+                from chunks_fts
+                join chunks c on c.id = chunks_fts.id
+                join facets f on f.chunk_id = c.id
+                where chunks_fts match ?{filter_sql}
+                group by f.facet_type, f.facet_value
+                order by f.facet_type, count desc, f.facet_value
+                """,
+                [query, *filter_params],
+            ).fetchall()
+        except sqlite3.OperationalError:
+            terms = [term.replace('"', '""') for term in query.split()]
+            quoted_query = " OR ".join(f'"{term}"' for term in terms if term)
+            if not quoted_query:
+                return {}
+            rows = db.execute(
+                f"""
+                select f.facet_type, f.facet_value, count(distinct c.id) as count
+                from chunks_fts
+                join chunks c on c.id = chunks_fts.id
+                join facets f on f.chunk_id = c.id
+                where chunks_fts match ?{filter_sql}
+                group by f.facet_type, f.facet_value
+                order by f.facet_type, count desc, f.facet_value
+                """,
+                [quoted_query, *filter_params],
+            ).fetchall()
+    counts: dict[str, dict[str, int]] = {}
+    for row in rows:
+        counts.setdefault(row["facet_type"], {})[row["facet_value"]] = int(row["count"])
+    return counts
 
 
 def graph_search(index_root: str | Path, query: str, limit: int = 5) -> list[dict[str, Any]]:

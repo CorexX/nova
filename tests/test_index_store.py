@@ -261,6 +261,90 @@ class IndexStoreTests(unittest.TestCase):
             self.assertIn("projects/nova/neighbor.md#0", ids)
             self.assertLess(len(matches), 6)
 
+    def test_rebuild_sqlite_index_extracts_facets_for_filtering(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            index_root = Path(tempdir) / "index"
+            index_store.rebuild_sqlite_index(index_root, [
+                {
+                    "id": "projects/nova/retrieval.md#0",
+                    "path": "projects/nova/retrieval.md",
+                    "section": "Hybrid Retrieval",
+                    "line_start": 1,
+                    "line_end": 4,
+                    "memory_type": "decision",
+                    "chunk_index": 0,
+                    "text": "Decision: use [[Hybrid Search]] for retrieval. #mcp/search",
+                    "embedding": [0.1],
+                },
+                {
+                    "id": "projects/other/retrieval.md#0",
+                    "path": "projects/other/retrieval.md",
+                    "section": "Hybrid Retrieval",
+                    "line_start": 1,
+                    "line_end": 4,
+                    "memory_type": "fact",
+                    "chunk_index": 0,
+                    "text": "Fact: retrieval can use unrelated filters. #archive",
+                    "embedding": [0.2],
+                },
+            ])
+
+            db = sqlite3.connect(index_root / "nova_index.sqlite")
+            try:
+                facets = {(row[0], row[1], row[2]) for row in db.execute(
+                    "select chunk_id, facet_type, facet_value from facets"
+                )}
+            finally:
+                db.close()
+
+        self.assertIn(("projects/nova/retrieval.md#0", "project", "nova"), facets)
+        self.assertIn(("projects/nova/retrieval.md#0", "memory_type", "decision"), facets)
+        self.assertIn(("projects/nova/retrieval.md#0", "tag", "mcp/search"), facets)
+        self.assertIn(("projects/nova/retrieval.md#0", "concept", "hybrid-search"), facets)
+        self.assertIn(("projects/nova/retrieval.md#0", "section", "hybrid-retrieval"), facets)
+
+    def test_full_text_search_applies_facet_filters_and_returns_counts(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            index_root = Path(tempdir) / "index"
+            index_store.rebuild_sqlite_index(index_root, [
+                {
+                    "id": "projects/nova/retrieval.md#0",
+                    "path": "projects/nova/retrieval.md",
+                    "section": "Hybrid Retrieval",
+                    "line_start": 1,
+                    "line_end": 4,
+                    "memory_type": "decision",
+                    "chunk_index": 0,
+                    "text": "Decision: use [[Hybrid Search]] for retrieval. #mcp/search",
+                    "embedding": [0.1],
+                },
+                {
+                    "id": "projects/other/retrieval.md#0",
+                    "path": "projects/other/retrieval.md",
+                    "section": "Other Retrieval",
+                    "line_start": 1,
+                    "line_end": 4,
+                    "memory_type": "fact",
+                    "chunk_index": 0,
+                    "text": "Fact: retrieval can use unrelated filters. #archive",
+                    "embedding": [0.2],
+                },
+            ])
+
+            matches = index_store.full_text_search(
+                index_root,
+                "retrieval",
+                limit=5,
+                filters={"project": "nova", "memory_type": ["decision"], "tag": "mcp/search"},
+            )
+            counts = index_store.facet_counts(index_root, "retrieval", filters={"project": "nova"})
+
+        self.assertEqual([match["id"] for match in matches], ["projects/nova/retrieval.md#0"])
+        self.assertEqual(matches[0]["meta"]["facets"]["project"], ["nova"])
+        self.assertEqual(counts["memory_type"], {"decision": 1})
+        self.assertEqual(counts["tag"], {"mcp/search": 1})
+        self.assertEqual(counts["concept"], {"hybrid-search": 1})
+
     def test_rebuild_sqlite_index_replaces_stale_rows(self):
         with tempfile.TemporaryDirectory() as tempdir:
             index_root = Path(tempdir) / "index"

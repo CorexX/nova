@@ -84,6 +84,134 @@ class KnowledgeQueryFullTextTests(unittest.TestCase):
         self.assertEqual(mode["enum"], ["semantic", "full_text", "hybrid", "graph"])
         self.assertEqual(mode["default"], "semantic")
 
+    def test_tool_schema_exposes_facet_filters(self):
+        tool = knowledge_query.get_tool_definition(Path.cwd())
+        properties = tool.inputSchema["properties"]
+        self.assertIn("filters", properties)
+        self.assertIn("include_facets", properties)
+
+    def test_knowledge_query_full_text_filters_by_facets_and_returns_counts(self):
+        original_env = dict(os.environ)
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            knowledge = root / "knowledge"
+            index_root = root / ".nova" / "index"
+            knowledge.mkdir()
+            os.environ["NOVA_KNOWLEDGE_ROOT"] = str(knowledge)
+            os.environ["NOVA_INDEX_ROOT"] = str(index_root)
+            os.environ["NOVA_SEARCH_ENABLED"] = "true"
+            try:
+                index_store.rebuild_sqlite_index(index_root, [
+                    {
+                        "id": "projects/nova/retrieval.md#0",
+                        "path": "projects/nova/retrieval.md",
+                        "section": "Hybrid Retrieval",
+                        "line_start": 1,
+                        "line_end": 4,
+                        "memory_type": "decision",
+                        "chunk_index": 0,
+                        "text": "Decision: use [[Hybrid Search]] for retrieval. #mcp/search",
+                        "embedding": [0.1],
+                    },
+                    {
+                        "id": "projects/other/retrieval.md#0",
+                        "path": "projects/other/retrieval.md",
+                        "section": "Other Retrieval",
+                        "line_start": 1,
+                        "line_end": 4,
+                        "memory_type": "fact",
+                        "chunk_index": 0,
+                        "text": "Fact: retrieval can use unrelated filters. #archive",
+                        "embedding": [0.2],
+                    },
+                ])
+
+                result = asyncio.run(knowledge_query.execute(
+                    {
+                        "query": "retrieval",
+                        "mode": "full_text",
+                        "limit": 5,
+                        "filters": {"project": "nova", "memory_type": ["decision"]},
+                        "include_facets": True,
+                    },
+                    root,
+                ))
+                payload = json.loads(result[0].text)
+            finally:
+                os.environ.clear()
+                os.environ.update(original_env)
+
+        self.assertEqual([match["id"] for match in payload["matches"]], ["projects/nova/retrieval.md#0"])
+        self.assertEqual(payload["filters"], {"project": ["nova"], "memory_type": ["decision"]})
+        self.assertEqual(payload["available_facets"]["memory_type"], {"decision": 1})
+        self.assertEqual(payload["available_facets"]["tag"], {"mcp/search": 1})
+
+    def test_knowledge_query_rejects_filters_outside_full_text_mode(self):
+        original_env = dict(os.environ)
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            knowledge = root / "knowledge"
+            knowledge.mkdir()
+            os.environ["NOVA_KNOWLEDGE_ROOT"] = str(knowledge)
+            os.environ["NOVA_SEARCH_ENABLED"] = "true"
+            try:
+                result = asyncio.run(knowledge_query.execute(
+                    {"query": "retrieval", "mode": "semantic", "filters": {"project": "nova"}},
+                    root,
+                ))
+                payload = json.loads(result[0].text)
+            finally:
+                os.environ.clear()
+                os.environ.update(original_env)
+
+        self.assertEqual(payload["status"], "error")
+        self.assertIn("mode=full_text", payload["message"])
+        self.assertEqual(payload["filters"], {"project": ["nova"]})
+
+    def test_knowledge_query_handles_facet_count_errors(self):
+        original_env = dict(os.environ)
+        original_facet_counts = knowledge_query.facet_counts
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            knowledge = root / "knowledge"
+            index_root = root / ".nova" / "index"
+            knowledge.mkdir()
+            os.environ["NOVA_KNOWLEDGE_ROOT"] = str(knowledge)
+            os.environ["NOVA_INDEX_ROOT"] = str(index_root)
+            os.environ["NOVA_SEARCH_ENABLED"] = "true"
+            try:
+                index_store.rebuild_sqlite_index(index_root, [
+                    {
+                        "id": "projects/nova/retrieval.md#0",
+                        "path": "projects/nova/retrieval.md",
+                        "section": "Hybrid Retrieval",
+                        "line_start": 1,
+                        "line_end": 4,
+                        "memory_type": "decision",
+                        "chunk_index": 0,
+                        "text": "Decision: use retrieval filters.",
+                        "embedding": [0.1],
+                    }
+                ])
+
+                def broken_facet_counts(index_root_arg, query, filters=None):
+                    raise RuntimeError("facet boom")
+
+                knowledge_query.facet_counts = broken_facet_counts
+                result = asyncio.run(knowledge_query.execute(
+                    {"query": "retrieval", "mode": "full_text", "include_facets": True},
+                    root,
+                ))
+                payload = json.loads(result[0].text)
+            finally:
+                knowledge_query.facet_counts = original_facet_counts
+                os.environ.clear()
+                os.environ.update(original_env)
+
+        self.assertEqual(payload["status"], "error")
+        self.assertIn("RuntimeError", payload["message"])
+        self.assertEqual(payload["query"], "retrieval")
+
     def test_knowledge_query_graph_mode_uses_graph_search(self):
         original_env = dict(os.environ)
         with tempfile.TemporaryDirectory() as tempdir:

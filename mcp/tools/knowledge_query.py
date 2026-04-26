@@ -158,6 +158,8 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
             "memory_type": meta.get("memory_type") or "fact",
             "chunk_index": meta.get("chunk_index"),
             "facets": meta.get("facets") or {},
+            "lifecycle_status": meta.get("lifecycle_status") or "active",
+            "supersedes": meta.get("supersedes") or [],
             "snippet": short_snippet(doc),
             "score": round(score, 4),
             "why_relevant": item.get("why_relevant") or ("full_text_match" if mode == "full_text" else "semantic_similarity"),
@@ -166,6 +168,8 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
                 "section": meta.get("section") or "",
                 "line_start": meta.get("line_start"),
                 "line_end": meta.get("line_end"),
+                "lifecycle_status": meta.get("lifecycle_status") or "active",
+                "supersedes": meta.get("supersedes") or [],
             },
         }
         if meta.get("graph_via") is not None:

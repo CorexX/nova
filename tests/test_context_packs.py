@@ -63,6 +63,27 @@ We will keep Markdown as source of truth.
         self.assertEqual(decision["line_end"], 5)
         self.assertIn("source of truth", decision["text"])
 
+    def test_split_by_headers_extracts_lifecycle_status_and_supersedes(self):
+        content = """# Knowledge Update - lifecycle
+
+## 12:00:00 - Newer Decision
+
+- entry_id: mem_new
+- status: active
+- supersedes: mem_old, mem_older
+
+Status: Accepted
+
+### Insight
+Use lifecycle metadata in retrieval.
+"""
+
+        chunks = memory_maintain._split_by_headers(content)
+
+        entry = next(chunk for chunk in chunks if chunk["section"] == "12:00:00 - Newer Decision")
+        self.assertEqual(entry["lifecycle_status"], "active")
+        self.assertEqual(entry["supersedes"], ["mem_old", "mem_older"])
+
 
 class ContextPackTests(unittest.TestCase):
     def test_context_resolve_dedupe_none_keeps_multiple_chunks_from_same_path(self):
@@ -83,7 +104,15 @@ class ContextPackTests(unittest.TestCase):
                         "path": "projects/nova/architecture.md",
                         "doc": "## Decision\nKeep four tools.",
                         "distance": 0.1,
-                        "meta": {"id": "projects/nova/architecture.md#1", "path": "projects/nova/architecture.md", "section": "Decision", "memory_type": "decision", "chunk_index": 1},
+                        "meta": {
+                            "id": "projects/nova/architecture.md#1",
+                            "path": "projects/nova/architecture.md",
+                            "section": "Decision",
+                            "memory_type": "decision",
+                            "chunk_index": 1,
+                            "lifecycle_status": "superseded",
+                            "supersedes": ["mem_old"],
+                        },
                     },
                     {
                         "id": "projects/nova/architecture.md#2",
@@ -106,6 +135,9 @@ class ContextPackTests(unittest.TestCase):
         self.assertEqual(payload["dedupe"], "none")
         self.assertEqual(len(payload["context_items"]), 2)
         self.assertEqual(payload["context_items"][0]["citation"]["id"], "projects/nova/architecture.md#1")
+        self.assertEqual(payload["context_items"][0]["lifecycle_status"], "superseded")
+        self.assertEqual(payload["context_items"][0]["supersedes"], ["mem_old"])
+        self.assertEqual(payload["context_items"][0]["citation"]["lifecycle_status"], "superseded")
         self.assertEqual(payload["context_items"][1]["citation"]["id"], "projects/nova/architecture.md#2")
 
     def test_context_resolve_dedupe_path_collapses_same_file(self):

@@ -161,6 +161,51 @@ class KnowledgeQueryTests(unittest.TestCase):
         self.assertEqual(match["citation"]["line_start"], 10)
         self.assertEqual(match["citation"]["line_end"], 12)
 
+    def test_knowledge_query_exposes_lifecycle_status_and_supersedes(self):
+        original_search = knowledge_query.semantic_search
+        original_env = dict(os.environ)
+        tempdir = tempfile.TemporaryDirectory()
+        try:
+            root = Path(tempdir.name)
+            knowledge = root / "knowledge"
+            knowledge.mkdir()
+            os.environ["NOVA_KNOWLEDGE_ROOT"] = str(knowledge)
+            os.environ["NOVA_SEARCH_ENABLED"] = "true"
+
+            def fake_search(chroma_path, query, top_k, log=None):
+                return [
+                    {
+                        "id": "projects/nova/lifecycle.md#0",
+                        "path": "projects/nova/lifecycle.md",
+                        "doc": "## New Decision\n- status: active\n- supersedes: mem_old",
+                        "distance": 0.1,
+                        "meta": {
+                            "id": "projects/nova/lifecycle.md#0",
+                            "path": "projects/nova/lifecycle.md",
+                            "section": "New Decision",
+                            "memory_type": "decision",
+                            "chunk_index": 0,
+                            "lifecycle_status": "active",
+                            "supersedes": ["mem_old"],
+                        },
+                    }
+                ]
+
+            knowledge_query.semantic_search = fake_search
+            result = asyncio.run(knowledge_query.execute({"query": "new decision"}, root))
+            payload = json.loads(result[0].text)
+        finally:
+            knowledge_query.semantic_search = original_search
+            os.environ.clear()
+            os.environ.update(original_env)
+            tempdir.cleanup()
+
+        match = payload["matches"][0]
+        self.assertEqual(match["lifecycle_status"], "active")
+        self.assertEqual(match["supersedes"], ["mem_old"])
+        self.assertEqual(match["citation"]["lifecycle_status"], "active")
+        self.assertEqual(match["citation"]["supersedes"], ["mem_old"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -35,6 +35,22 @@ ALLOWED_MEMORY_TYPES = {
 
 ALLOWED_LIFECYCLE_STATUSES = {"active", "candidate", "superseded", "stale", "archived", "rejected"}
 
+
+def _parse_lifecycle_status(text: str) -> str:
+    matches = re.findall(r"(?im)^\s*[-*]\s*status\s*:\s*([a-z_-]+)\s*$", text)
+    return matches[-1].strip().lower() if matches else "active"
+
+
+def _parse_supersedes(text: str) -> list[str]:
+    matches = re.findall(r"(?im)^\s*(?:[-*]\s*)?supersedes\s*:\s*(.+?)\s*$", text)
+    if not matches:
+        return []
+    raw = matches[-1].strip()
+    if raw in {"[]", "-", "none", "None"}:
+        return []
+    return [item.strip().strip("'\"") for item in raw.split(",") if item.strip().strip("'\"")]
+
+
 REQUIRED_INDEX_FIELDS = {
     "id",
     "path",
@@ -105,6 +121,8 @@ def _split_by_headers(content: str) -> list[dict[str, Any]]:
             "line_start": 1,
             "line_end": len(lines),
             "memory_type": _classify_memory_type("", text),
+            "lifecycle_status": _parse_lifecycle_status(text),
+            "supersedes": _parse_supersedes(text),
         }]
 
     chunks: list[dict[str, Any]] = []
@@ -117,12 +135,15 @@ def _split_by_headers(content: str) -> list[dict[str, Any]]:
             continue
         header_match = re.match(r"^(#{1,2})\s+(.+)", lines[start_idx])
         section_name = header_match.group(2).strip() if header_match else ""
+        chunk_text = raw_section[:2000]
         chunks.append({
-            "text": raw_section[:2000],
+            "text": chunk_text,
             "section": section_name,
             "line_start": start_idx + 1,
             "line_end": end_idx + 1,
             "memory_type": _classify_memory_type(section_name, raw_section),
+            "lifecycle_status": _parse_lifecycle_status(raw_section),
+            "supersedes": _parse_supersedes(raw_section),
         })
     return chunks
 
@@ -250,7 +271,16 @@ async def _run_validate(workspace_root: Path) -> dict:
         if memory_type and memory_type not in ALLOWED_MEMORY_TYPES:
             problems.append(_problem("invalid_memory_type", f"invalid memory_type: {memory_type}", memory_type=memory_type, id=item_id))
         text = str(item.get("text", ""))
-        status_matches = re.findall(r"(?im)^\s*(?:[-*]\s*)?status\s*:\s*([a-z_-]+)\s*$", text)
+        lifecycle_status = str(item.get("lifecycle_status") or "").strip().lower()
+        if lifecycle_status and lifecycle_status not in ALLOWED_LIFECYCLE_STATUSES:
+            problems.append(_problem(
+                "invalid_lifecycle_status",
+                f"invalid lifecycle status: {lifecycle_status}",
+                status=lifecycle_status,
+                id=item_id,
+                path=path,
+            ))
+        status_matches = re.findall(r"(?im)^\s*[-*]\s*status\s*:\s*([a-z_-]+)\s*$", text)
         for lifecycle_status in status_matches:
             if lifecycle_status.lower() not in ALLOWED_LIFECYCLE_STATUSES:
                 problems.append(_problem(
@@ -260,6 +290,11 @@ async def _run_validate(workspace_root: Path) -> dict:
                     id=item_id,
                     path=path,
                 ))
+        supersedes = item.get("supersedes")
+        if supersedes is not None and (
+            not isinstance(supersedes, list) or not all(isinstance(value, str) and value.strip() for value in supersedes)
+        ):
+            problems.append(_problem("invalid_supersedes", "supersedes must be a list of non-empty strings", id=item_id, path=path))
         embedding = item.get("embedding")
         if not isinstance(embedding, list) or not embedding or not all(isinstance(value, (int, float)) for value in embedding):
             problems.append(_problem("invalid_embedding", "embedding must be a non-empty numeric list", id=item_id, item_index=idx))
@@ -383,6 +418,8 @@ async def _run_index(args: dict, workspace_root: Path) -> dict:
                 "line_start": chunk.get("line_start"),
                 "line_end": chunk.get("line_end"),
                 "memory_type": chunk.get("memory_type", "fact"),
+                "lifecycle_status": chunk.get("lifecycle_status", "active"),
+                "supersedes": chunk.get("supersedes", []),
                 "chunk_index": idx,
                 "text": chunk["text"],
                 "embedding": emb,

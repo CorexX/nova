@@ -73,6 +73,41 @@ class IndexStoreTests(unittest.TestCase):
             self.assertEqual(matches[0]["meta"]["memory_type"], "decision")
             self.assertEqual(matches[0]["why_relevant"], "full_text_match")
 
+    def test_rebuild_sqlite_index_preserves_lifecycle_metadata_and_facets(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            index_root = Path(tempdir) / "index"
+            index_store.rebuild_sqlite_index(index_root, [
+                {
+                    "id": "projects/nova/lifecycle.md#0",
+                    "path": "projects/nova/lifecycle.md",
+                    "section": "New Decision",
+                    "line_start": 1,
+                    "line_end": 8,
+                    "memory_type": "decision",
+                    "lifecycle_status": "active",
+                    "supersedes": ["mem_old"],
+                    "chunk_index": 0,
+                    "text": "New lifecycle retrieval decision",
+                    "embedding": [0.1],
+                }
+            ])
+
+            matches = index_store.full_text_search(index_root, "lifecycle retrieval", limit=5)
+
+            self.assertEqual(len(matches), 1)
+            self.assertEqual(matches[0]["meta"]["lifecycle_status"], "active")
+            self.assertEqual(matches[0]["meta"]["supersedes"], ["mem_old"])
+            self.assertEqual(matches[0]["meta"]["facets"]["lifecycle_status"], ["active"])
+            self.assertEqual(matches[0]["meta"]["facets"]["supersedes"], ["mem_old"])
+
+            filtered = index_store.full_text_search(
+                index_root,
+                "lifecycle retrieval",
+                limit=5,
+                filters={"lifecycle_status": "active", "supersedes": "mem_old"},
+            )
+            self.assertEqual([match["id"] for match in filtered], ["projects/nova/lifecycle.md#0"])
+
     def test_full_text_score_is_higher_for_better_bm25_rank(self):
         with tempfile.TemporaryDirectory() as tempdir:
             index_root = Path(tempdir) / "index"

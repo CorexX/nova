@@ -39,6 +39,12 @@ def get_tool_definition(workspace_root: Path) -> Tool:
                     "default": False,
                     "description": "Optional: liefert eine kompakte Ordneruebersicht (sinnvoll fuer session init).",
                 },
+                "dedupe": {
+                    "type": "string",
+                    "enum": ["none", "path", "section"],
+                    "default": "section",
+                    "description": "Deduplizierung: keine, pro Pfad oder pro Pfad+Section/Chunk",
+                },
             },
             "required": ["query"],
         },
@@ -148,10 +154,12 @@ def _extract_numbered_section(md_text: str, heading: str, max_items: int = 8) ->
 
 def _citation(path: str, meta: dict) -> dict:
     return {
+        "id": meta.get("id") or "",
         "path": path,
         "section": meta.get("section") or "",
         "line_start": meta.get("line_start"),
         "line_end": meta.get("line_end"),
+        "chunk_index": meta.get("chunk_index"),
     }
 
 
@@ -196,6 +204,37 @@ def _build_context_pack(query: str, project_hint: str, items: list[dict]) -> dic
     }
 
 
+def _estimate_context_chars(items: list[dict]) -> int:
+    total = 0
+    for item in items:
+        total += len(str(item.get("path", "")))
+        total += len(str(item.get("section", "")))
+        total += len(str(item.get("snippet", "")))
+        total += 24
+    return total
+
+
+def _apply_context_budget(items: list[dict], token_budget: int) -> tuple[list[dict], dict]:
+    """Apply a conservative context-item budget using a 4 chars/token approximation."""
+    budget_chars = token_budget * 4
+    max_context_chars = max(240, budget_chars - 600)
+    trimmed = [dict(item) for item in items]
+    for item in trimmed:
+        item["snippet"] = short_snippet(str(item.get("snippet", "")), max_chars=220)
+    original_count = len(trimmed)
+    while len(trimmed) > 1 and _estimate_context_chars(trimmed) > max_context_chars:
+        trimmed.pop()
+    estimated_tokens = max(1, (_estimate_context_chars(trimmed) + 3) // 4) if trimmed else 0
+    return trimmed, {
+        "applied": True,
+        "method": "chars_per_token_approx",
+        "token_budget": token_budget,
+        "estimated_tokens": estimated_tokens,
+        "original_items": original_count,
+        "returned_items": len(trimmed),
+    }
+
+
 def _core_directives(cfg, workspace_root: Path) -> dict:
     principles_md = cfg.principles_md
     if not principles_md.exists():
@@ -226,6 +265,9 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     token_budget = max(300, int(args.get("token_budget", 1200)))
     scope = [str(s) for s in (args.get("scope") or [])]
     include_inventory = _as_bool(args.get("include_inventory", False))
+    dedupe = str(args.get("dedupe", "section")).strip().lower()
+    if dedupe not in {"none", "path", "section"}:
+        dedupe = "section"
     if not query:
         return [TextContent(type="text", text=json_text({"status": "error", "message": "query is required"}))]
 
@@ -256,14 +298,26 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     for item in results:
         meta = item.get("meta") or {}
         path = str(item.get("path") or meta.get("path") or "")
-        if not path or path in seen or not _path_in_scope(path, scope):
+        if not path or not _path_in_scope(path, scope):
             continue
-        seen.add(path)
+        chunk_index = meta.get("chunk_index")
+        item_id = str(item.get("id") or meta.get("id") or "")
+        if dedupe == "path":
+            dedupe_key = path
+        elif dedupe == "section":
+            dedupe_key = item_id or f"{path}#{meta.get('section') or ''}#{chunk_index if chunk_index is not None else ''}"
+        else:
+            dedupe_key = ""
+        if dedupe_key and dedupe_key in seen:
+            continue
+        if dedupe_key:
+            seen.add(dedupe_key)
         distance = float(item.get("distance", 1.0))
         score = float(max(0.0, 1.0 - distance))
         doc = str(item.get("doc") or item.get("text") or "")
         items.append({
             "path": path,
+            "id": item_id,
             "score": round(score, 4),
             "snippet": short_snippet(doc),
             "reason": "semantic_match",
@@ -284,6 +338,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
                 item["reason"] += "+project_hint_boost"
         items.sort(key=lambda x: x["score"], reverse=True)
 
+    items, budget_info = _apply_context_budget(items, token_budget)
     confidence = 0.0 if not items else round(min(0.99, sum(i["score"] for i in items) / len(items)), 4)
     sources = [{"path": i["path"], "score": i["score"]} for i in items]
     context_items = [
@@ -303,8 +358,10 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
         "query": query,
         "project_hint": project_hint or None,
         "selection_reason": "semantic_search",
+        "dedupe": dedupe,
         "confidence": confidence,
         "token_budget": token_budget,
+        "budget": budget_info,
         "context_items": context_items,
         "context_pack": _build_context_pack(query, project_hint, items),
         "sources": sources,

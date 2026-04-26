@@ -200,10 +200,16 @@ def _search_from_semantic_index(
     ranked = sorted(heap, key=lambda x: (x[0], x[1]), reverse=True)
     return [
         {
+            "id": item.get("id", ""),
             "doc": item.get("text", ""),
             "meta": {
+                "id": item.get("id", ""),
                 "path": item.get("path", ""),
                 "section": item.get("section", ""),
+                "line_start": item.get("line_start"),
+                "line_end": item.get("line_end"),
+                "memory_type": item.get("memory_type", "fact"),
+                "chunk_index": item.get("chunk_index"),
             },
             "distance": 1.0 - sim,
             "path": item.get("path", ""),

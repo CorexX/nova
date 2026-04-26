@@ -171,6 +171,30 @@ class MemoryValidateTests(unittest.TestCase):
         self.assertEqual(payload["status"], "warn")
         self.assertIn("generated_artifact_tracked", codes)
 
+    def test_index_operation_rebuilds_sqlite_fts_index(self):
+        original_encoder = memory_maintain.batch_encode_texts
+        try:
+            note = self.knowledge / "commands.md"
+            note.write_text("# Commands\n\nRun exact ticket lookup with SQLite FTS.\n", encoding="utf-8")
+
+            def fake_encode(texts):
+                return [[1.0, 0.0] for _ in texts]
+
+            memory_maintain.batch_encode_texts = fake_encode
+            result = asyncio.run(memory_maintain.execute({"operation": "index", "force": True}, self.root))
+            payload = json.loads(result[0].text)
+        finally:
+            memory_maintain.batch_encode_texts = original_encoder
+
+        self.assertEqual(payload["status"], "ok")
+        sqlite_index_file = Path(payload["details"]["sqlite_index_file"])
+        self.assertTrue(sqlite_index_file.exists())
+
+        from tools.index_store import full_text_search
+
+        matches = full_text_search(self.index, "exact ticket lookup", limit=3)
+        self.assertEqual([match["path"] for match in matches], ["knowledge-root/commands.md"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -50,6 +50,18 @@ It does not own:
 
 Those belong to an operator. NOVA only supplies memory and context.
 
+## Search Layer
+
+NOVA combines three search engines behind the memory/query tools:
+
+| Engine | Strength |
+|---|---|
+| Semantic Search | Finds meaning, synonyms, and conceptual similarity |
+| SQLite Full-Text Search | Finds exact terms, names, IDs, paths, and commands |
+| Graph-lite Retrieval | Finds related concepts, memory types, and neighborhood evidence |
+
+`hybrid` mode fuses those signals into one ranked result set. Vector search is only one sensor, not the whole brain.
+
 ## Architecture
 
 ```text
@@ -79,7 +91,7 @@ Those belong to an operator. NOVA only supplies memory and context.
 The Knowledge Base is the source of truth. Indexes are generated artifacts.
 
 ```text
-Markdown files -> parser/indexer -> semantic_index.json / future SQLite FTS / graph
+Markdown files -> parser/indexer -> semantic_index.json + nova_index.sqlite + graph-lite edges
 ```
 
 If an index is deleted, NOVA should be able to rebuild it from the Knowledge Base.

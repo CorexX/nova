@@ -50,15 +50,34 @@ It does not own:
 
 Those belong to an operator. NOVA only supplies memory and context.
 
+## Core Concepts
+
+NOVA uses a few deliberately specific terms. Translation table, because architecture words multiply like gremlins after midnight:
+
+| Term | Meaning in NOVA |
+|---|---|
+| **Operator** | The external agent, CLI, human, or automation that plans and acts. NOVA does not act; it answers memory/context requests. |
+| **Memory / Context System** | NOVA's role: retrieve relevant memory, package it into useful context, and persist new durable insights. |
+| **Knowledge Base** | The human-readable Markdown vault. This is the source of truth. |
+| **MCP** | [Model Context Protocol](https://modelcontextprotocol.io/), the protocol NOVA uses to expose its tools to operators. |
+| **Context Pack** | A compact, cited bundle of relevant decisions, constraints, open questions, tasks, facts, and source files for the current query. |
+| **Durable Memory** | A knowledge entry worth keeping beyond the current session, stored in Markdown with source/provenance. |
+| **Append-first** | NOVA prefers adding a new sourced entry over silently rewriting old knowledge. History stays visible. |
+| **Provenance** | Source metadata answering: where did this come from, when was it observed, and how confident is it? |
+| **Derived Index** | Rebuildable search/cache data generated from Markdown. Useful, but disposable. Not source truth. |
+| **Lifecycle Status** | A memory state such as `active`, `candidate`, `superseded`, `stale`, `archived`, or `rejected`. |
+| **Supersedes** | A list of memory IDs that a newer memory replaces. This preserves replacement chains instead of pretending old context vanished. |
+| **Facets** | Structured filter values in the SQLite index, e.g. project, memory type, tag, lifecycle status, or superseded memory ID. |
+
 ## Search Layer
 
 NOVA combines three search engines behind the memory/query tools:
 
 | Engine | Technology | Upstream / Maintainer | Strength |
 |---|---|---|---|
-| Semantic Search | [Sentence Transformers](https://www.sbert.net/) using `all-MiniLM-L6-v2` | [UKP Lab / Sentence Transformers project](https://www.sbert.net/) | Finds meaning, synonyms, and conceptual similarity |
-| SQLite Full-Text Search | [SQLite FTS5](https://www.sqlite.org/fts5.html) | [SQLite project](https://www.sqlite.org/) | Finds exact terms, names, IDs, paths, and commands |
-| Graph-lite Retrieval | NOVA's local graph-lite index over Markdown metadata and memory relations | Internal NOVA component | Finds related concepts, memory types, and neighborhood evidence |
+| **Semantic Search** | [Sentence Transformers](https://www.sbert.net/) using `all-MiniLM-L6-v2` | [UKP Lab / Sentence Transformers project](https://www.sbert.net/) | Finds meaning, synonyms, and conceptual similarity |
+| **SQLite Full-Text Search** | [SQLite FTS5](https://www.sqlite.org/fts5.html) | [SQLite project](https://www.sqlite.org/) | Finds exact terms, names, IDs, paths, and commands |
+| **Graph-lite Retrieval** | NOVA's local graph-lite index over Markdown metadata and memory relations | Internal NOVA component | Finds related concepts, memory types, lifecycle links, and neighborhood evidence |
 
 `hybrid` mode fuses those signals into one ranked result set. Vector search is only one sensor, not the whole brain.
 
@@ -76,26 +95,51 @@ NOVA combines three search engines behind the memory/query tools:
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    operator["Operator<br/>plans + acts"]
+    mcp["MCP<br/>tool calls"]
+
+    subgraph nova["NOVA 2.0 — Memory / Context System"]
+        tools["4 MCP Tools<br/>context · query · update · maintain"]
+        context["Context Pack<br/>selected + cited + budgeted"]
+        write["Append-first Durable Memory<br/>provenance · lifecycle status · supersedes"]
+        indexer["Parser / Indexer<br/>Markdown → chunks + metadata"]
+    end
+
+    kb[("Knowledge Base<br/>Markdown + Git<br/>source of truth")]
+
+    subgraph idx["Derived Indexes — disposable / rebuildable"]
+        semantic["Semantic Search<br/>Sentence Transformers"]
+        fts["SQLite FTS5<br/>exact terms + facets"]
+        graph["Graph-lite Retrieval<br/>concepts + lifecycle links"]
+    end
+
+    operator -->|asks what matters| mcp --> tools
+    tools --> context --> operator
+    tools -->|persist insight| write --> kb
+    kb --> indexer
+    indexer --> semantic
+    indexer --> fts
+    indexer --> graph
+    semantic -->|meaning signal| tools
+    fts -->|exact/facet signal| tools
+    graph -->|relationship signal| tools
+```
+
+### Data Flow
+
 ```text
-                 +----------------+
-                 |    Operator    |
-                 | plans + acts   |
-                 +-------+--------+
-                         |
-                         | MCP
-                         v
-              +----------+-----------+
-              |      NOVA 2.0        |
-              | Memory / Context     |
-              +----------+-----------+
-                         |
-        +----------------+----------------+
-        |                                 |
-        v                                 v
-+-------+---------+              +--------+--------+
-| Knowledge Base  |              | Derived Indexes |
-| Markdown + Git  |              | search/cache    |
-+-----------------+              +-----------------+
+Operator query
+  -> NOVA MCP tools
+  -> Semantic Search + SQLite FTS + Graph-lite Retrieval
+  -> ranked matches with citations, facets, lifecycle_status, supersedes
+  -> Context Pack for the operator
+
+Knowledge update
+  -> append-first Markdown entry with provenance
+  -> parser/indexer
+  -> semantic_index.json + nova_index.sqlite + graph-lite edges
 ```
 
 ### Source of Truth

@@ -114,7 +114,7 @@ def _split_by_headers(content: str) -> list[dict[str, Any]]:
         if re.match(r"^#{1,2}\s+.+", line)
     ]
     if not header_indexes and content.strip():
-        text = content.strip()[:2000]
+        text = content.strip()[:4000]
         return [{
             "text": text,
             "section": "",
@@ -135,7 +135,7 @@ def _split_by_headers(content: str) -> list[dict[str, Any]]:
             continue
         header_match = re.match(r"^(#{1,2})\s+(.+)", lines[start_idx])
         section_name = header_match.group(2).strip() if header_match else ""
-        chunk_text = raw_section[:2000]
+        chunk_text = raw_section[:4000]
         chunks.append({
             "text": chunk_text,
             "section": section_name,

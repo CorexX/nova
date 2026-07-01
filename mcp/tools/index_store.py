@@ -57,7 +57,10 @@ def sqlite_index_path(index_root: str | Path) -> Path:
 def _connect(index_root: str | Path) -> sqlite3.Connection:
     db_path = sqlite_index_path(index_root)
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(db_path)
+    # timeout=30: SQLite retries for up to 30 s when the DB is locked by a
+    # concurrent writer (e.g. rebuild_sqlite_index running while a search hits
+    # the same file on an Azure Files volume).
+    db = sqlite3.connect(db_path, timeout=30)
     db.row_factory = sqlite3.Row
     return db
 
@@ -551,14 +554,35 @@ def facet_counts(index_root: str | Path, query: str, filters: dict[str, Any] | N
     return counts
 
 
-def graph_search(index_root: str | Path, query: str, limit: int = 5) -> list[dict[str, Any]]:
-    """Search seed chunks with FTS, then expand one hop through graph relations."""
+def graph_search(
+    index_root: str | Path,
+    query: str,
+    limit: int = 5,
+    semantic_seeds: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Search seed chunks, then expand one hop through graph relations.
+
+    If *semantic_seeds* are provided they are used as primary seeds
+    (embedding-based), with FTS seeds merged in as fallback.
+    """
     db_path = sqlite_index_path(index_root)
     if not db_path.exists() or not query.strip():
         return []
     safe_limit = max(1, min(50, int(limit)))
     seed_limit = min(50, max(safe_limit * 3, safe_limit + 5))
-    seeds = full_text_search(index_root, query, seed_limit)
+
+    # Merge semantic + FTS seeds, semantic first (higher quality).
+    fts_seeds = full_text_search(index_root, query, seed_limit)
+    semantic_seed_ids = {str(s.get("id") or "") for s in semantic_seeds or []}
+    if semantic_seeds:
+        seen_ids = set(semantic_seed_ids)
+        merged = list(semantic_seeds)
+        for fs in fts_seeds:
+            if str(fs.get("id") or "") not in seen_ids:
+                merged.append(fs)
+        seeds = merged[:seed_limit]
+    else:
+        seeds = fts_seeds
     if not seeds:
         return []
     max_seed_results = safe_limit if safe_limit == 1 else max(1, safe_limit - 1)
@@ -571,9 +595,15 @@ def graph_search(index_root: str | Path, query: str, limit: int = 5) -> list[dic
             seed_id = str(seed.get("id") or "")
             if not seed_id:
                 continue
+            effective_score = float(seed.get("score", 1.0))
+            if "score" not in seed and "distance" in seed:
+                effective_score = max(0.0, 1.0 - float(seed["distance"]))
             if seed_id not in seen_chunk_ids and len(results) < max_seed_results:
                 seed_copy = dict(seed)
-                seed_copy["why_relevant"] = "graph_seed_full_text"
+                seed_copy["why_relevant"] = "graph_seed_semantic" if seed_id in semantic_seed_ids else "graph_seed_full_text"
+                # Ensure score exists (semantic seeds only have distance).
+                if "score" not in seed_copy and "distance" in seed_copy:
+                    seed_copy["score"] = effective_score
                 results.append(seed_copy)
                 seen_chunk_ids.add(seed_id)
 
@@ -600,7 +630,7 @@ def graph_search(index_root: str | Path, query: str, limit: int = 5) -> list[dic
                 neighbor_results.append(_chunk_row_to_result(
                     row,
                     why_relevant="graph_neighbor",
-                    score=max(0.0, float(seed.get("score", 1.0)) - 0.1),
+                    score=max(0.0, effective_score - 0.1),
                     distance=min(1.0, float(seed.get("distance", 0.0)) + 0.1),
                     graph_via=[via],
                 ))

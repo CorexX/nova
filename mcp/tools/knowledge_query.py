@@ -160,7 +160,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
             "facets": meta.get("facets") or {},
             "lifecycle_status": meta.get("lifecycle_status") or "active",
             "supersedes": meta.get("supersedes") or [],
-            "snippet": short_snippet(doc),
+            "snippet": short_snippet(doc, max_chars=800),
             "score": round(score, 4),
             "why_relevant": item.get("why_relevant") or ("full_text_match" if mode == "full_text" else "semantic_similarity"),
             "citation": {

@@ -252,10 +252,11 @@ def graph_search(
     query: str,
     top_k: int = 5,
     log: Callable[[str], None] | None = None,
+    semantic_seeds: list[dict] | None = None,
 ) -> list[dict]:
     if log:
         log("Searching SQLite graph index...")
-    items = _sqlite_graph_search(index_root, query, top_k)
+    items = _sqlite_graph_search(index_root, query, top_k, semantic_seeds=semantic_seeds)
     if log:
         log("Done")
     return items
@@ -328,7 +329,7 @@ def hybrid_search(
     candidate_k = max(top_k * 3, top_k)
     semantic_items = semantic_search(chroma_path, query, candidate_k, log)
     full_text_items = full_text_search(index_root, query, candidate_k, log)
-    graph_items = graph_search(index_root, query, candidate_k, log)
+    graph_items = graph_search(index_root, query, candidate_k, log, semantic_seeds=semantic_items)
     by_id: dict[str, dict] = {}
     graph_reasons: dict[str, str] = {}
 
@@ -347,11 +348,13 @@ def hybrid_search(
 
     for item in graph_items:
         key, merged = _ensure_hybrid_entry(by_id, item)
-        graph_reasons[key] = str(item.get("why_relevant") or "")
-        merged["hybrid_signals"]["graph"] = max(
-            merged["hybrid_signals"]["graph"],
-            _bounded_score(float(item.get("score", 0.0))),
-        )
+        graph_reason = str(item.get("why_relevant") or "")
+        graph_reasons[key] = graph_reason
+        if graph_reason != "graph_seed_semantic":
+            merged["hybrid_signals"]["graph"] = max(
+                merged["hybrid_signals"]["graph"],
+                _bounded_score(float(item.get("score", 0.0))),
+            )
         graph_meta = item.get("meta") or {}
         if graph_meta.get("graph_via") is not None:
             merged.setdefault("meta", {})["graph_via"] = graph_meta.get("graph_via")

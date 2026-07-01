@@ -199,10 +199,21 @@ nova/
 │   ├── PRINCIPLES.md
 │   ├── ROADMAP.md
 │   └── SYSTEM.md
+├── scripts/
+│   ├── README.md
+│   └── planner.sh / planner_rest.py
 ├── templates/
 │   └── knowledge/
 └── tests/
 ```
+
+## Local Helper Scripts
+
+`scripts/` contains local operator helpers that sit next to NOVA but are not part of the NOVA MCP core.
+
+- `planner.*` = Microsoft Planner wrapper via Microsoft Graph
+
+See `scripts/README.md` for command examples, config locations, and guardrails.
 
 ## Configuration
 

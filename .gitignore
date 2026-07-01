@@ -48,3 +48,8 @@ index/
 # Private vaults / local workspaces
 nova-knowledge/
 nova.code-workspace
+
+# Operator-local artifacts (customer/personal — kept in nova-knowledge, never here)
+exports/
+.hermes/
+Dockerfile.minimal

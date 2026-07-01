@@ -224,7 +224,7 @@ def _apply_context_budget(items: list[dict], token_budget: int) -> tuple[list[di
     max_context_chars = max(240, budget_chars - 600)
     trimmed = [dict(item) for item in items]
     for item in trimmed:
-        item["snippet"] = short_snippet(str(item.get("snippet", "")), max_chars=220)
+        item["snippet"] = short_snippet(str(item.get("snippet", "")), max_chars=600)
     original_count = len(trimmed)
     while len(trimmed) > 1 and _estimate_context_chars(trimmed) > max_context_chars:
         trimmed.pop()
@@ -266,7 +266,7 @@ async def execute(args: dict, workspace_root: Path) -> list[TextContent]:
     cfg = resolve_paths(workspace_root)
     query = str(args.get("query", "")).strip()
     project_hint = str(args.get("project_hint", "")).strip()
-    token_budget = max(300, int(args.get("token_budget", 1200)))
+    token_budget = max(300, int(args.get("token_budget", 4000)))
     scope = [str(s) for s in (args.get("scope") or [])]
     include_inventory = _as_bool(args.get("include_inventory", False))
     dedupe = str(args.get("dedupe", "section")).strip().lower()

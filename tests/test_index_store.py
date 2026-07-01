@@ -212,6 +212,54 @@ class IndexStoreTests(unittest.TestCase):
             self.assertEqual(matches[1]["why_relevant"], "graph_neighbor")
             self.assertIn("concept:sqlite-fts", matches[1]["meta"]["graph_via"])
 
+    def test_graph_search_accepts_semantic_seeds_and_scores_neighbors_from_effective_score(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            index_root = Path(tempdir) / "index"
+            index_store.rebuild_sqlite_index(index_root, [
+                {
+                    "id": "projects/nova/semantic-question.md#0",
+                    "path": "projects/nova/semantic-question.md",
+                    "section": "Semantic Question",
+                    "line_start": 1,
+                    "line_end": 3,
+                    "memory_type": "question",
+                    "chunk_index": 0,
+                    "text": "How do meaning-based seeds expand? See [[Semantic Graph]].",
+                    "embedding": [0.1],
+                },
+                {
+                    "id": "projects/nova/semantic-decision.md#0",
+                    "path": "projects/nova/semantic-decision.md",
+                    "section": "Semantic Graph",
+                    "line_start": 1,
+                    "line_end": 4,
+                    "memory_type": "decision",
+                    "chunk_index": 0,
+                    "text": "# Semantic Graph\nDecision: semantic seeds should still expand through graph links.",
+                    "embedding": [0.2],
+                },
+            ])
+
+            matches = index_store.graph_search(
+                index_root,
+                "unmatched lexical query",
+                limit=5,
+                semantic_seeds=[{
+                    "id": "projects/nova/semantic-question.md#0",
+                    "distance": 0.25,
+                    "path": "projects/nova/semantic-question.md",
+                }],
+            )
+
+            self.assertEqual([match["id"] for match in matches], [
+                "projects/nova/semantic-question.md#0",
+                "projects/nova/semantic-decision.md#0",
+            ])
+            self.assertEqual(matches[0]["why_relevant"], "graph_seed_semantic")
+            self.assertEqual(matches[0]["score"], 0.75)
+            self.assertEqual(matches[1]["why_relevant"], "graph_neighbor")
+            self.assertAlmostEqual(matches[1]["score"], 0.65)
+
     def test_graph_search_expands_through_shared_memory_type(self):
         with tempfile.TemporaryDirectory() as tempdir:
             index_root = Path(tempdir) / "index"

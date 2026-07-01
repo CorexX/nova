@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONFIG_FILE="${PLANNER_ENV_FILE:-/path/to/.hermes/secrets/planner.env}"
+CONFIG_FILE="${PLANNER_ENV_FILE:-$HOME/.hermes/secrets/planner.env}"
 
 usage() {
   cat <<'USAGE'
@@ -22,7 +22,7 @@ Usage:
   scripts/planner.sh raw <graph-path>
 
 Config:
-  Loads /path/to/.hermes/secrets/planner.env by default.
+  Loads $HOME/.hermes/secrets/planner.env by default.
   Supported variables:
     PLANNER_TENANT_ID        (required)
     PLANNER_DEFAULT_PLAN_ID  (optional)
@@ -34,13 +34,13 @@ Auth:
 Examples:
   scripts/planner.sh doctor
   scripts/planner.sh plans
-  scripts/planner.sh plan "Projekte & Kunden"
-  scripts/planner.sh buckets your_plan_id_here
-  scripts/planner.sh tasks your_plan_id_here
-  scripts/planner.sh search example-client "Projekte & Kunden"
-  scripts/planner.sh create-plan "example-client / UCL"
-  scripts/planner.sh create-bucket "example-client / UCL" "Current"
-  scripts/planner.sh create-task "example-client / UCL" "Current" "Knowledge Retrieval Review aufsetzen"
+  scripts/planner.sh plan "My Projects"
+  scripts/planner.sh buckets <plan-id>
+  scripts/planner.sh tasks <plan-id>
+  scripts/planner.sh search Roadmap "My Projects"
+  scripts/planner.sh create-plan "Example Plan"
+  scripts/planner.sh create-bucket "Example Plan" "Current"
+  scripts/planner.sh create-task "Example Plan" "Current" "Set up review workflow"
   scripts/planner.sh scaffold-board "NOVA"
   scripts/planner.sh raw /me/planner/tasks?$top=5
 USAGE
